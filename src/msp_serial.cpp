@@ -161,7 +161,7 @@ void MSPSerial::sendGPS(const TelemetryData &data) {
 //   set gps_provider = MSP
 //   save
 //
-void MSPSerial::sendFrame(uint16_t cmd, const uint8_t *payload, uint16_t length) {
+void MSPSerial::sendFrame(uint16_t cmd, const uint8_t *payload, uint16_t length, char dir) {
     constexpr uint8_t FLAG = 0x00;
 
     const uint8_t cmdLo  = cmd    & 0xFF;
@@ -181,7 +181,7 @@ void MSPSerial::sendFrame(uint16_t cmd, const uint8_t *payload, uint16_t length)
     // Write atomically — UART TX FIFO on ESP32 is 128 bytes, well above our 56-byte frame
     _serial->write('$');
     _serial->write('X');
-    _serial->write('>');
+    _serial->write(static_cast<uint8_t>(dir));
     _serial->write(FLAG);
     _serial->write(cmdLo);
     _serial->write(cmdHi);
@@ -193,10 +193,11 @@ void MSPSerial::sendFrame(uint16_t cmd, const uint8_t *payload, uint16_t length)
 
 void MSPSerial::sendCustomText(uint8_t textType, const char *text) {
     const uint8_t textLen = static_cast<uint8_t>(strlen(text));
-    uint8_t buf[1 + 16];   // type + up to 16 chars (OSD Custom Message max)
+    uint8_t buf[1 + 1 + 16];   // type(1) + length(1) + up to 16 chars
     buf[0] = textType;
-    memcpy(buf + 1, text, textLen);
-    sendFrame(MSP2_SET_TEXT, buf, 1 + textLen);
+    buf[1] = textLen;
+    memcpy(buf + 2, text, textLen);
+    sendFrame(MSP2_SET_TEXT, buf, 2 + textLen, '<');
 }
 
 void MSPSerial::sendBatteryAsCustomMessage(const BatteryData &data) {

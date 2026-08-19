@@ -11,18 +11,17 @@
 #define MSP2_SENSOR_BAROMETER       0x1F01
 #define MSP2_SENSOR_MAGNETOMETER    0x1F02
 
-// Betaflight 4.5+ text field setter (see src/main/msp/msp.h in BF source).
-// Payload: textType(1) + text bytes (length from MSP size field, no null).
-#define MSP2_SET_TEXT               0x1031
+// Betaflight text field setter (msp_protocol_v2_betaflight.h: 0x3007).
+// Direction '<' (command). Payload: textType(1) + textLen(1) + text bytes.
+#define MSP2_SET_TEXT               0x3007
 
-// Text type values for MSP2_SET_TEXT / MSP2_GET_TEXT
-#define MSP_TEXT_PILOT_NAME         0
-#define MSP_TEXT_CRAFT_NAME         1
-#define MSP_TEXT_PID_PROFILE_NAME   2
-#define MSP_TEXT_RATE_PROFILE_NAME  3
-#define MSP_TEXT_HARDWARE_NAME      4
-#define MSP_TEXT_CUSTOM_1           5   // "Custom Message 1" OSD element
-#define MSP_TEXT_CUSTOM_2           6   // "Custom Message 2" OSD element
+// Text type values for MSP2_SET_TEXT / MSP2_GET_TEXT (msp_protocol_v2_betaflight.h)
+#define MSP_TEXT_PILOT_NAME         1
+#define MSP_TEXT_CRAFT_NAME         2
+#define MSP_TEXT_PID_PROFILE_NAME   3
+#define MSP_TEXT_RATE_PROFILE_NAME  4
+#define MSP_TEXT_CUSTOM_1           7   // MSP2TEXT_CUSTOM_MSG_0   — "Custom Message 1" OSD
+#define MSP_TEXT_CUSTOM_2           8   // MSP2TEXT_CUSTOM_MSG_0+1 — "Custom Message 2" OSD
 
 // Custom vendor command — carries DJI Action camera battery state.
 // Receivers that don't recognise 0x3001 silently ignore the frame.
@@ -64,7 +63,7 @@ struct __attribute__((packed)) MSP2GpsPayload {
     uint8_t  min;
     uint8_t  sec;
 };
-static_assert(sizeof(MSP2GpsPayload) == 48, "GPS payload size mismatch");
+static_assert(sizeof(MSP2GpsPayload) == 52, "GPS payload size mismatch");
 
 // MSP2_CAMERA_BATTERY (0x3001) payload — custom vendor message.
 struct __attribute__((packed)) MSP2CameraBatteryPayload {
@@ -107,8 +106,9 @@ public:
 
 private:
     // ── TX ────────────────────────────────────────────────────────────────
-    // MSP v2 push frame:    $ X > | flag(1) cmd(2LE) size(2LE) payload | crc8
-    void sendFrame(uint16_t cmd, const uint8_t *payload, uint16_t length);
+    // MSP v2 frame: $ X dir | flag(1) cmd(2LE) size(2LE) payload | crc8
+    // dir='>' for push (sensor injection); dir='<' for commands (SET_TEXT etc.)
+    void sendFrame(uint16_t cmd, const uint8_t *payload, uint16_t length, char dir = '>');
     // MSP v2 request frame: $ X < | flag(1) cmd(2LE) size(2LE) [empty] | crc8
     void sendRequest(uint16_t cmd);
     // MSP2_SET_TEXT helper: type(1) + text bytes
