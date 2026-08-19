@@ -3,9 +3,11 @@
 #include <stdbool.h>
 
 // ─── BLE service / characteristic UUIDs (16-bit short form) ─────────────────
-#define DJI_SERVICE_UUID        0xFFF0   // main GATT service
-#define DJI_NOTIFY_CHAR_UUID    0xFFF4   // camera → ESP32  (Notify)
-#define DJI_WRITE_CHAR_UUID     0xFFF5   // ESP32  → camera (Write)
+#define DJI_SERVICE_UUID         0xFFF0   // main GATT service
+#define DJI_NOTIFY_CHAR_UUID     0xFFF4   // camera → ESP32  (Notify)
+#define DJI_NOTIFY_CHAR_UUID_ALT 0xFFF3   // fallback notify on DJI Action 5 Pro
+#define DJI_WRITE_CHAR_UUID      0xFFF5   // ESP32  → camera (Write, older cameras)
+#define DJI_WRITE_CHAR_UUID_ALT  0xFFF3   // ESP32  → camera (Write, DJI Action 5 Pro)
 
 // ─── Frame layout ─────────────────────────────────────────────────────────────
 // Byte  0    : SOF = 0xAA
@@ -47,8 +49,8 @@
 #define DJI_CMD_NEW_STATUS  0x06
 
 // Record control actions (CmdSet 0x1D, CmdID 0x03)
-#define DJI_RECORD_START            0x01
-#define DJI_RECORD_STOP             0x00
+#define DJI_RECORD_START            0x00
+#define DJI_RECORD_STOP             0x01
 
 // Status subscription push modes
 #define DJI_PUSH_OFF                0
@@ -120,9 +122,11 @@ static_assert(sizeof(DJIStatusSubscription) == 6, "DJIStatusSubscription size mi
 
 // Record control — ESP32 → camera (CmdSet 0x1D, CmdID 0x03)
 struct __attribute__((packed)) DJIRecordControl {
+    uint32_t device_id;             // same device_id sent in DJIConnectRequest
     uint8_t  action;                // DJI_RECORD_START / DJI_RECORD_STOP
+    uint8_t  reserved[4];           // must be zero
 };
-static_assert(sizeof(DJIRecordControl) == 1, "DJIRecordControl size mismatch");
+static_assert(sizeof(DJIRecordControl) == 9, "DJIRecordControl size mismatch");
 
 // ─── Protocol API ─────────────────────────────────────────────────────────────
 

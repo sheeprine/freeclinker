@@ -10,11 +10,32 @@ void BLECamera::begin() {
     _instance = this;
     BLEDevice::init("ESP32-DJI-Bridge");
     BLEDevice::setPower(ESP_PWR_LVL_P9);
-    BLEDevice::setMTU(500);   // camera status frames are ~56 bytes; default MTU is fine but 500 leaves room
+    BLEDevice::setMTU(500);   // sets local preference; per-connection exchange done via _client->setMTU()
     startScan();
 }
 
 void BLECamera::update() {
+    // Deferred connect ACK: send from the main loop, not from the BLE callback,
+    // to avoid calling writeValue() inside a BLE stack context (causes crash).
+    if (_pendingConnectAck && _bleConnected && !_djiConnected) {
+        _pendingConnectAck = false;
+
+        DJIConnectResponse resp{};
+        resp.device_id = 0x00000001;
+        resp.ret_code  = 0;
+
+        if (!sendFrame(DJI_CMDSET_GENERAL, DJI_CMD_CONNECT, DJI_ACK,
+                       reinterpret_cast<const uint8_t *>(&resp), sizeof(resp),
+                       /*with_rsp=*/false, /*override_seq=*/(int32_t)_pendingAckSeq)) {
+            DBG_SERIAL.println("[DJI] Failed to send connect ACK");
+        } else {
+            DBG_SERIAL.println("[DJI] Connection established — subscribing to status");
+            if (sendStatusSubscription())
+                _djiConnected = true;
+        }
+        return;
+    }
+
     if (_djiConnected || _bleConnected || _scanning) return;
 
     if (_targetFound) {
@@ -103,6 +124,15 @@ bool BLECamera::connectAndSetup() {
         _lastAttemptMs = millis();
         return false;
     }
+
+    // Request MTU=500 immediately after connecting so DJI frames (up to ~56 bytes)
+    // arrive in a single notification rather than truncated to 20 bytes.
+    if (_client->setMTU(500)) {
+        DBG_SERIAL.printf("[BLE] MTU exchange sent (want 500, got %u)\n", _client->getMTU());
+    } else {
+        DBG_SERIAL.println("[BLE] MTU exchange failed — staying at 23");
+    }
+
     DBG_SERIAL.println("[BLE] BLE connected");
 
 #if DEBUG_PRINT_SERVICES
@@ -132,16 +162,21 @@ bool BLECamera::connectAndSetup() {
     notifyCh->registerForNotify(notifyCallback);
     DBG_SERIAL.println("[BLE] Subscribed to 0xFFF4 notify");
 
-    // Write characteristic (0xFFF5) — ESP32 → camera
+    // Write characteristic — ESP32 → camera.
+    // Older cameras: 0xFFF5.  DJI Action 5 Pro: 0xFFF5 reports w=0, fall back to 0xFFF3.
     _writeChar = svc->getCharacteristic(BLEUUID((uint16_t)DJI_WRITE_CHAR_UUID));
     if (!_writeChar || !_writeChar->canWrite()) {
-        DBG_SERIAL.println("[BLE] Write char 0xFFF5 not found or not writable");
+        _writeChar = svc->getCharacteristic(BLEUUID((uint16_t)DJI_WRITE_CHAR_UUID_ALT));
+    }
+    if (!_writeChar || !_writeChar->canWrite()) {
+        DBG_SERIAL.println("[BLE] No writable command char found (tried 0xFFF5, 0xFFF3)");
         _client->disconnect();
         _targetFound   = false;
         _lastAttemptMs = millis();
         return false;
     }
-    DBG_SERIAL.println("[BLE] Write char 0xFFF5 ready");
+    DBG_SERIAL.printf("[BLE] Write char 0x%04X ready\n",
+                      _writeChar->getUUID().getNative()->uuid.uuid16);
 
     _bleConnected = true;
 
@@ -184,11 +219,13 @@ void BLECamera::printServices() {
 // ─── DJI frame send ───────────────────────────────────────────────────────────
 
 bool BLECamera::sendFrame(uint8_t cmd_set, uint8_t cmd_id, uint8_t cmd_type,
-                           const uint8_t *payload, uint16_t len, bool with_rsp) {
+                           const uint8_t *payload, uint16_t len,
+                           bool with_rsp, int32_t override_seq) {
     if (!_writeChar) return false;
     uint8_t buf[DJI_MAX_FRAME];
+    uint16_t seq = (override_seq >= 0) ? (uint16_t)override_seq : _seq++;
     uint16_t n = dji_build_frame(buf, sizeof(buf), cmd_set, cmd_id, cmd_type,
-                                  _seq++, payload, len);
+                                  seq, payload, len);
     if (n == 0) return false;
     _writeChar->writeValue(buf, n, with_rsp);
     return true;
@@ -197,13 +234,19 @@ bool BLECamera::sendFrame(uint8_t cmd_set, uint8_t cmd_id, uint8_t cmd_type,
 // Step 1 of DJI handshake — send controller identity to the camera.
 // The camera responds via notify (CmdSet 0x00, CmdID 0x19, DJI_ACK).
 bool BLECamera::sendConnectionRequest() {
+    uint8_t mac[6] = {};
+    esp_read_mac(mac, ESP_MAC_BT);
+
     DJIConnectRequest req{};
-    req.device_id    = 0x00000001;
+    // Use the lower 4 bytes of our BT MAC as device_id — stable across reboots,
+    // unique per ESP32, no NVS needed.
+    _deviceId        = (uint32_t)mac[2] << 24 | (uint32_t)mac[3] << 16 |
+                       (uint32_t)mac[4] <<  8 | (uint32_t)mac[5];
+    req.device_id    = _deviceId;
     req.mac_addr_len = 6;
-    const uint8_t *mac = esp_bt_dev_get_address();
-    if (mac) memcpy(req.mac_addr, mac, 6);
-    req.fw_version  = 0x01000000;
-    req.verify_mode = 0;
+    memcpy(req.mac_addr, mac, 6);
+    req.fw_version  = 0x00;   // 0 = "no version" per DJI reference; non-zero triggers OTA update prompt
+    req.verify_mode = 0;      // 0 = reconnect (camera auto-approves); 1 = new pairing
     req.verify_data = 0;
 
     bool ok = sendFrame(DJI_CMDSET_GENERAL, DJI_CMD_CONNECT, DJI_CMD,
@@ -214,7 +257,9 @@ bool BLECamera::sendConnectionRequest() {
 }
 
 bool BLECamera::startRecording() {
-    DJIRecordControl ctrl{ DJI_RECORD_START };
+    DJIRecordControl ctrl{};
+    ctrl.device_id = _deviceId;
+    ctrl.action    = DJI_RECORD_START;
     bool ok = sendFrame(DJI_CMDSET_CAMERA, DJI_CMD_RECORD_CTRL, DJI_CMD,
                         reinterpret_cast<const uint8_t *>(&ctrl), sizeof(ctrl),
                         /*with_rsp=*/true);
@@ -223,7 +268,9 @@ bool BLECamera::startRecording() {
 }
 
 bool BLECamera::stopRecording() {
-    DJIRecordControl ctrl{ DJI_RECORD_STOP };
+    DJIRecordControl ctrl{};
+    ctrl.device_id = _deviceId;
+    ctrl.action    = DJI_RECORD_STOP;
     bool ok = sendFrame(DJI_CMDSET_CAMERA, DJI_CMD_RECORD_CTRL, DJI_CMD,
                         reinterpret_cast<const uint8_t *>(&ctrl), sizeof(ctrl),
                         /*with_rsp=*/true);
@@ -250,7 +297,15 @@ void BLECamera::notifyCallback(BLERemoteCharacteristic * /*ch*/,
     if (_instance) _instance->handleNotification(data, static_cast<size_t>(len));
 }
 
+// Each BLE notification arrives as ≤20 bytes (ATT MTU 23 = 20 data bytes if no MTU exchange).
+// Full DJI frames can be 27–51+ bytes. We dispatch whatever we receive:
+//   • If the notification holds the complete frame (len >= frame_len): full CRC parse.
+//   • If truncated (len < frame_len): header-only dispatch — enough for the 4-step handshake
+//     because the critical fields (CmdSet, CmdID, cmd_type, seq, ret_code) all land within
+//     the first 20 bytes of every known frame type.
 void BLECamera::handleNotification(uint8_t *data, size_t length) {
+    if (length == 0) return;
+
 #if DEBUG_PRINT_SERVICES
     DBG_SERIAL.printf("[BLE] Notify %u bytes:", length);
     for (size_t i = 0; i < length && i < 24; i++)
@@ -259,47 +314,92 @@ void BLECamera::handleNotification(uint8_t *data, size_t length) {
     DBG_SERIAL.println();
 #endif
 
-    uint8_t cmd_type, cmd_set, cmd_id;
-    const uint8_t *payload;
-    uint16_t payload_len;
+    // 0x55-prefixed telemetry stream and anything else that isn't a DJI frame — ignore.
+    if (data[0] != DJI_SOF) return;
+    if (length < 14) return;   // need at least SOF…CmdID
 
-    if (!dji_parse_frame(data, (uint16_t)length,
-                          &cmd_type, &cmd_set, &cmd_id,
-                          &payload, &payload_len)) {
-        DBG_SERIAL.println("[DJI] Frame parse failed (bad CRC or length)");
+    uint16_t frame_len = (uint16_t)data[1] | (((uint16_t)data[2] & 0x03) << 8);
+    uint8_t  cmd_type  = data[3];
+    uint16_t seq       = (uint16_t)data[8] | ((uint16_t)data[9] << 8);
+    uint8_t  cmd_set   = data[12];
+    uint8_t  cmd_id    = data[13];
+
+    // Complete frame — verify both CRCs before dispatching.
+    if (frame_len >= DJI_OVERHEAD && length >= frame_len) {
+        const uint8_t *payload;
+        uint16_t payload_len;
+        if (!dji_parse_frame(data, frame_len, &cmd_type, &cmd_set, &cmd_id,
+                              &payload, &payload_len)) {
+            DBG_SERIAL.printf("[DJI] CRC error: cs=0x%02X id=0x%02X\n", cmd_set, cmd_id);
+            return;
+        }
+        dispatchFrame(cmd_type, cmd_set, cmd_id, seq, payload, payload_len);
         return;
     }
 
-    dispatchFrame(cmd_type, cmd_set, cmd_id, payload, payload_len);
+    // Partial frame (MTU limited): dispatch header + whatever payload bytes arrived.
+    // All critical fields for the 4-step handshake are within the first 20 bytes.
+    const uint8_t *partial     = (length > 14) ? data + 14 : nullptr;
+    uint16_t       partial_len = (length > 14) ? (uint16_t)(length - 14) : 0;
+    dispatchFrame(cmd_type, cmd_set, cmd_id, seq, partial, partial_len);
 }
 
 void BLECamera::dispatchFrame(uint8_t cmd_type, uint8_t cmd_set, uint8_t cmd_id,
-                               const uint8_t *payload, uint16_t payload_len) {
-    if (cmd_set == DJI_CMDSET_GENERAL && cmd_id == DJI_CMD_CONNECT && DJI_IS_ACK(cmd_type))
-        handleConnectResponse(payload, payload_len);
-    else if (cmd_set == DJI_CMDSET_CAMERA && cmd_id == DJI_CMD_STATUS_PUSH)
+                               uint16_t seq, const uint8_t *payload, uint16_t payload_len) {
+    if (cmd_set == DJI_CMDSET_GENERAL && cmd_id == DJI_CMD_CONNECT) {
+        if (DJI_IS_ACK(cmd_type))
+            handleConnectResponse(payload, payload_len);
+        else
+            handleConnectCommand(seq, payload, payload_len);
+    } else if (cmd_set == DJI_CMDSET_CAMERA && cmd_id == DJI_CMD_STATUS_PUSH) {
         handleCameraStatus(payload, payload_len);
-    else
-        DBG_SERIAL.printf("[DJI] Unhandled frame: cmdset=0x%02X cmdid=0x%02X type=0x%02X\n",
+    } else if (cmd_set == DJI_CMDSET_CAMERA && cmd_id == DJI_CMD_RECORD_CTRL
+               && DJI_IS_ACK(cmd_type)) {
+        handleRecordAck(payload, payload_len);
+    } else {
+        DBG_SERIAL.printf("[DJI] Unhandled: cs=0x%02X id=0x%02X type=0x%02X\n",
                           cmd_set, cmd_id, cmd_type);
+    }
 }
 
 // ─── DJI frame handlers ───────────────────────────────────────────────────────
 
+// Step 4 of handshake: camera ACKed our connect request.
+// Don't subscribe yet — the camera will next send its own hello (step 5),
+// which we ACK (step 6) and THEN subscribe to status (step 7).
 void BLECamera::handleConnectResponse(const uint8_t *payload, uint16_t len) {
-    if (len < sizeof(DJIConnectResponse)) {
-        DBG_SERIAL.println("[DJI] Connect response too short");
+    // ret_code is at DJIConnectResponse byte 4 (after the 4-byte device_id).
+    // We always get at least 6 bytes of payload even with 20-byte MTU notifications.
+    if (len < 5) {
+        DBG_SERIAL.println("[DJI] ACK payload too short — ignoring");
         return;
     }
-    const auto *resp = reinterpret_cast<const DJIConnectResponse *>(payload);
-    if (resp->ret_code != 0) {
-        DBG_SERIAL.printf("[DJI] Connection rejected, ret_code=%u\n", resp->ret_code);
+    uint8_t ret_code = payload[4];
+    if (ret_code != 0) {
+        DBG_SERIAL.printf("[DJI] Connection rejected: ret_code=%u\n", ret_code);
         _client->disconnect();
         return;
     }
-    DBG_SERIAL.println("[DJI] Connection accepted");
-    if (sendStatusSubscription())
-        _djiConnected = true;
+    DBG_SERIAL.println("[DJI] Connect ACK received — waiting for camera hello");
+}
+
+// Step 5 of handshake: camera sends its own connect request (cmd_type 0x02 = CMD).
+// We must ACK with the same seq number, then subscribe to status.
+// NOTE: called from inside the BLE notify callback — defer the BLE write to update().
+void BLECamera::handleConnectCommand(uint16_t camSeq, const uint8_t * /*payload*/,
+                                      uint16_t /*len*/) {
+    if (_djiConnected || _pendingConnectAck) return;   // already handled
+    DBG_SERIAL.printf("[DJI] Camera hello (seq=0x%04X) — queuing ACK\n", camSeq);
+    _pendingAckSeq     = camSeq;
+    _pendingConnectAck = true;
+}
+
+void BLECamera::handleRecordAck(const uint8_t *payload, uint16_t len) {
+    uint8_t ret = (len > 0) ? payload[0] : 0xFF;
+    if (ret == 0)
+        DBG_SERIAL.println("[DJI] Record command OK");
+    else
+        DBG_SERIAL.printf("[DJI] Record command rejected: ret=0x%02X\n", ret);
 }
 
 void BLECamera::handleCameraStatus(const uint8_t *payload, uint16_t len) {

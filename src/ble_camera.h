@@ -7,7 +7,7 @@
 #include <BLERemoteCharacteristic.h>
 #include <BLEAdvertisedDevice.h>
 #include <esp_gap_ble_api.h>
-#include <esp_bt.h>             // esp_bt_dev_get_address()
+#include <esp_mac.h>            // esp_read_mac()
 #include "dji_protocol.h"
 #include "telemetry.h"
 
@@ -15,17 +15,16 @@ using BatteryCallback = void (*)(const BatteryData &);
 
 // BLE client for DJI Action cameras.
 //
-// Connection sequence
-// ───────────────────
+// 4-step connection sequence (DJI BLE protocol)
+// ──────────────────────────────────────────────
 // 1. Scan — identify DJI cameras by manufacturer data (0xAA 0x08 … 0xFA)
-// 2. Connect to strongest-signal device
-// 3. Locate service 0xFFF0; subscribe to notify char 0xFFF4; store write char 0xFFF5
-// 4. Send connection handshake (CmdSet 0x00, CmdID 0x19)
-// 5. On ACK: subscribe to camera status push (CmdSet 0x1D, CmdID 0x05, 2 Hz)
-// 6. Parse incoming status frames (CmdSet 0x1D, CmdID 0x02) for battery %
-//
-// Note: the camera does NOT push its own GPS over this BLE interface — the
-// SDK's GPS command (0x00/0x17) flows ESP32 → camera, not the other way round.
+// 2. Connect; subscribe to 0xFFF4 notify; locate write char (0xFFF5, or 0xFFF3 on Action 5 Pro)
+// 3. ESP32 → camera: connect request   (CmdSet 0x00 / CmdID 0x19 / CMD)
+// 4. Camera → ESP32: ACK               (CmdSet 0x00 / CmdID 0x19 / ACK, ret_code 0 = OK)
+// 5. Camera → ESP32: its own hello     (CmdSet 0x00 / CmdID 0x19 / CMD, cmd_type 0x02)
+// 6. ESP32 → camera: ACK to camera hello (same seq as step 5)
+// 7. ESP32 → camera: status subscription (CmdSet 0x1D / CmdID 0x05, 2 Hz)
+// 8. Camera → ESP32: 2 Hz status push  (CmdSet 0x1D / CmdID 0x02) — battery % + mode
 class BLECamera : public BLEAdvertisedDeviceCallbacks,
                   public BLEClientCallbacks {
 public:
@@ -52,15 +51,19 @@ private:
     bool sendStatusSubscription();  // DJI handshake step 2
 
     // ── DJI frame I/O ─────────────────────────────────────────────────────
+    // override_seq >= 0 forces a specific seq number (for ACKing camera frames).
     bool sendFrame(uint8_t cmd_set, uint8_t cmd_id, uint8_t cmd_type,
-                   const uint8_t *payload, uint16_t len, bool with_rsp = false);
+                   const uint8_t *payload, uint16_t len,
+                   bool with_rsp = false, int32_t override_seq = -1);
 
     void handleNotification(uint8_t *data, size_t length);
     void dispatchFrame(uint8_t cmd_type, uint8_t cmd_set, uint8_t cmd_id,
-                       const uint8_t *payload, uint16_t payload_len);
+                       uint16_t seq, const uint8_t *payload, uint16_t payload_len);
 
     void handleConnectResponse(const uint8_t *payload, uint16_t len);
+    void handleConnectCommand(uint16_t camSeq, const uint8_t *payload, uint16_t len);
     void handleCameraStatus(const uint8_t *payload, uint16_t len);
+    void handleRecordAck(const uint8_t *payload, uint16_t len);
 
     // ── Debug ─────────────────────────────────────────────────────────────
     void printServices();
@@ -82,6 +85,12 @@ private:
     uint16_t                  _seq          = 0;
     uint32_t                  _lastAttemptMs = 0;
 
+    // Deferred connect ACK: set from the notify callback, executed in update()
+    // to avoid calling writeValue() from inside a BLE stack callback.
+    bool                      _pendingConnectAck = false;
+    uint16_t                  _pendingAckSeq     = 0;
+
+    uint32_t         _deviceId   = 0;      // device_id used in connect request
     BatteryCallback  _batteryCb  = nullptr;
     BatteryData      _battery{};
 
