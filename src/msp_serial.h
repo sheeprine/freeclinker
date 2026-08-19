@@ -99,6 +99,9 @@ public:
     // Format battery % as "CAM:NNN%" and push as Betaflight Custom Message 1.
     void sendBatteryAsCustomMessage(const BatteryData &data);
 
+    // Push "REC" or "IDLE" as Betaflight Custom Message 2.
+    void sendRecordingAsCustomMessage(const BatteryData &data);
+
     bool isArmed() const { return _armed; }
     void setArmCallback(ArmCallback cb) { _armCb = cb; }
 

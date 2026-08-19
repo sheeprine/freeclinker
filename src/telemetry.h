@@ -38,4 +38,5 @@ struct BatteryData {
     uint16_t capacity;     // mAh total      (0 = unknown)
     int8_t   temperature;  // °C  (INT8_MIN = unknown)
     uint8_t  cellCount;    // 0 = unknown
+    bool     recording;    // true while camera_status == 0x03
 };

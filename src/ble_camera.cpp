@@ -313,6 +313,7 @@ void BLECamera::handleCameraStatus(const uint8_t *payload, uint16_t len) {
     _battery.capacity    = 0;
     _battery.temperature = INT8_MIN;  // unknown
     _battery.cellCount   = 0;
+    _battery.recording   = (status->camera_status == 0x03);
     _battery.valid       = true;
 
     if (_batteryCb) _batteryCb(_battery);

@@ -208,6 +208,10 @@ void MSPSerial::sendBatteryAsCustomMessage(const BatteryData &data) {
     sendCustomText(MSP_TEXT_CUSTOM_1, text);
 }
 
+void MSPSerial::sendRecordingAsCustomMessage(const BatteryData &data) {
+    sendCustomText(MSP_TEXT_CUSTOM_2, data.recording ? "REC" : "IDLE");
+}
+
 void MSPSerial::sendCameraBattery(const BatteryData &data) {
     MSP2CameraBatteryPayload p{};
     p.percent     = data.percent;
