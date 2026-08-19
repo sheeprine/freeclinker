@@ -17,7 +17,7 @@
       overflow: hidden;
     }
 
-    /* ── Header ── */
+    /* ── Header ─────────────────────────────────────────────────────────────── */
     header {
       display: flex;
       align-items: center;
@@ -28,14 +28,9 @@
       flex-shrink: 0;
     }
 
-    .brand {
-      font-size: 13px;
-      font-weight: bold;
-      color: #60a5fa;
-      margin-right: auto;
-    }
+    .brand { font-size: 13px; font-weight: bold; color: #60a5fa; margin-right: auto; }
 
-    label { font-size: 12px; color: #888; display: flex; align-items: center; gap: 6px; }
+    .hdr-label { font-size: 12px; color: #888; display: flex; align-items: center; gap: 6px; }
 
     select {
       background: #2a2a2a;
@@ -47,12 +42,7 @@
       font-size: 12px;
     }
 
-    .dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: #555;
-      flex-shrink: 0;
-    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; flex-shrink: 0; }
     .dot.connected { background: #4ade80; box-shadow: 0 0 6px #4ade8088; }
 
     #statusText { font-size: 12px; color: #666; }
@@ -76,25 +66,145 @@
     button.danger  { background: #7f1d1d; border-color: #991b1b; color: #fca5a5; }
     button.danger:hover:not(:disabled)  { background: #991b1b; }
 
-    /* ── Terminal ── */
+    /* ── Tab bar ─────────────────────────────────────────────────────────────── */
+    .tab-bar {
+      display: flex;
+      background: #1a1a1a;
+      border-bottom: 1px solid #2d2d2d;
+      padding: 0 12px;
+      flex-shrink: 0;
+    }
+
+    .tab {
+      padding: 8px 16px;
+      border: none;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      background: transparent;
+      color: #6b7280;
+      cursor: pointer;
+      font-size: 13px;
+      margin-bottom: -1px;
+      transition: color 0.1s;
+    }
+    .tab:hover:not(:disabled) { background: transparent; color: #9ca3af; }
+    .tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+
+    /* ── Panels ──────────────────────────────────────────────────────────────── */
+    .panels { flex: 1; position: relative; overflow: hidden; }
+
+    .panel {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel.active { display: flex; }
+
+    /* ── Easy Config panel ───────────────────────────────────────────────────── */
+    #panel-config { overflow-y: auto; align-items: center; padding: 28px 16px; }
+
+    .config-card {
+      width: 100%;
+      max-width: 460px;
+      background: #1e1e1e;
+      border: 1px solid #2d2d2d;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid #2d2d2d;
+    }
+    .card-header h2 { font-size: 13px; color: #9ca3af; font-weight: normal; letter-spacing: 0.05em; text-transform: uppercase; }
+
+    .cfg-field {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 18px;
+      border-bottom: 1px solid #252525;
+    }
+    .cfg-field:last-of-type { border-bottom: none; }
+
+    .cfg-field-text { flex: 1; min-width: 0; }
+    .cfg-field-name { font-size: 14px; color: #e2e8f0; margin-bottom: 2px; }
+    .cfg-field-desc { font-size: 11px; color: #6b7280; line-height: 1.4; }
+
+    /* toggle switch */
+    .switch { position: relative; display: inline-flex; width: 42px; height: 24px; flex-shrink: 0; cursor: pointer; }
+    .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .track {
+      width: 42px; height: 24px;
+      background: #374151;
+      border-radius: 12px;
+      transition: background 0.2s;
+      position: relative;
+    }
+    .thumb {
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 18px; height: 18px;
+      background: #9ca3af;
+      border-radius: 50%;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .switch input:checked ~ .track { background: #1d4ed8; }
+    .switch input:checked ~ .track .thumb { transform: translateX(18px); background: #fff; }
+    .switch input:disabled ~ .track { opacity: 0.35; cursor: default; }
+
+    /* number input */
+    .num-wrap { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+    .num-wrap input[type=number] {
+      width: 90px;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 4px;
+      color: #d4d4d4;
+      font: inherit;
+      font-size: 14px;
+      padding: 4px 8px;
+      text-align: right;
+    }
+    .num-wrap input[type=number]:focus { outline: none; border-color: #2563eb; }
+    .num-wrap input[type=number]:disabled { opacity: 0.35; }
+    .num-unit  { color: #6b7280; font-size: 12px; }
+    .num-equiv { color: #4b5563; font-size: 11px; margin-left: 4px; }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 12px 18px;
+      border-top: 1px solid #2d2d2d;
+    }
+
+    .saved-msg {
+      font-size: 12px;
+      color: #4ade80;
+      opacity: 0;
+      transition: opacity 0.4s;
+      margin-right: auto;
+    }
+
+    /* ── CLI panel ───────────────────────────────────────────────────────────── */
     #terminal {
       flex: 1;
       overflow-y: auto;
       padding: 12px 16px;
-      scroll-behavior: smooth;
     }
 
-    .line {
-      white-space: pre-wrap;
-      word-break: break-all;
-      line-height: 1.55;
-    }
+    .line { white-space: pre-wrap; word-break: break-all; line-height: 1.55; }
     .line.sys  { color: #6b7280; }
     .line.cmd  { color: #60a5fa; }
     .line.err  { color: #f87171; }
-    .line.warn { color: #fbbf24; }
 
-    /* ── Input bar ── */
     .input-bar {
       display: flex;
       align-items: center;
@@ -119,7 +229,7 @@
     #cmdInput::placeholder { color: #374151; }
     #cmdInput:disabled { opacity: 0.3; }
 
-    /* ── No-serial notice ── */
+    /* ── No-serial overlay ───────────────────────────────────────────────────── */
     #noSerial {
       display: none;
       position: fixed;
@@ -136,10 +246,11 @@
 </head>
 <body>
 
+<!-- ── Header ── -->
 <header>
   <span class="brand">DJI Action Bridge</span>
 
-  <label>Baud
+  <label class="hdr-label">Baud
     <select id="baudRate">
       <option value="115200" selected>115200</option>
       <option value="57600">57600</option>
@@ -154,12 +265,63 @@
   <button class="danger"  id="disconnectBtn" disabled>Disconnect</button>
 </header>
 
-<div id="terminal"></div>
+<!-- ── Tab bar ── -->
+<div class="tab-bar">
+  <button class="tab active" data-tab="config">Easy Config</button>
+  <button class="tab"        data-tab="cli">CLI</button>
+</div>
 
-<div class="input-bar">
-  <span class="prompt">&gt;</span>
-  <input id="cmdInput" type="text" placeholder="type a command and press Enter…" disabled autocomplete="off" spellcheck="false">
-  <button id="sendBtn" disabled>Send</button>
+<!-- ── Panels ── -->
+<div class="panels">
+
+  <!-- Easy Config -->
+  <div id="panel-config" class="panel active">
+    <div class="config-card">
+      <div class="card-header">
+        <h2>Recording Control</h2>
+        <button id="readBtn" disabled>Read from device</button>
+      </div>
+
+      <!-- Stop on disarm -->
+      <div class="cfg-field">
+        <div class="cfg-field-text">
+          <div class="cfg-field-name">Stop recording on disarm</div>
+          <div class="cfg-field-desc">When off, the camera keeps recording regardless of FC arm state.</div>
+        </div>
+        <label class="switch" title="Stop on disarm">
+          <input type="checkbox" id="stopOnDisarm" checked disabled>
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+
+      <!-- Disarm delay -->
+      <div class="cfg-field" style="flex-direction:column; align-items:flex-start;">
+        <div class="cfg-field-name">Disarm delay</div>
+        <div class="cfg-field-desc">Delay between FC disarm and stopping the recording. 0 = stop immediately.</div>
+        <div class="num-wrap">
+          <input type="number" id="disarmDelay" min="0" max="60000" step="500" value="0" disabled>
+          <span class="num-unit">ms</span>
+          <span class="num-equiv" id="delayEquiv"></span>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <span class="saved-msg" id="savedMsg"></span>
+        <button id="applyBtn" class="primary" disabled>Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLI -->
+  <div id="panel-cli" class="panel">
+    <div id="terminal"></div>
+    <div class="input-bar">
+      <span class="prompt">&gt;</span>
+      <input id="cmdInput" type="text" placeholder="type a command and press Enter…" disabled autocomplete="off" spellcheck="false">
+      <button id="sendBtn" disabled>Send</button>
+    </div>
+  </div>
+
 </div>
 
 <div id="noSerial">
@@ -172,29 +334,51 @@
 <script>
 'use strict';
 
-const terminal     = document.getElementById('terminal');
-const cmdInput     = document.getElementById('cmdInput');
-const connectBtn   = document.getElementById('connectBtn');
-const disconnectBtn= document.getElementById('disconnectBtn');
-const sendBtn      = document.getElementById('sendBtn');
-const statusText   = document.getElementById('statusText');
-const dot          = document.getElementById('dot');
-const baudSelect   = document.getElementById('baudRate');
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const terminal      = document.getElementById('terminal');
+const cmdInput      = document.getElementById('cmdInput');
+const connectBtn    = document.getElementById('connectBtn');
+const disconnectBtn = document.getElementById('disconnectBtn');
+const sendBtn       = document.getElementById('sendBtn');
+const statusText    = document.getElementById('statusText');
+const dot           = document.getElementById('dot');
+const baudSelect    = document.getElementById('baudRate');
+const readBtn       = document.getElementById('readBtn');
+const applyBtn      = document.getElementById('applyBtn');
+const stopToggle    = document.getElementById('stopOnDisarm');
+const delayInput    = document.getElementById('disarmDelay');
+const delayEquiv    = document.getElementById('delayEquiv');
+const savedMsg      = document.getElementById('savedMsg');
 
-// ── State ──────────────────────────────────────────────────────────────────
+// ── Serial state ──────────────────────────────────────────────────────────────
 let port        = null;
 let writer      = null;
 let reader      = null;
 let keepReading = false;
 let lineBuf     = '';
 
+// ── CLI history ───────────────────────────────────────────────────────────────
 const history = [];
 let histIdx   = -1;
 let histDraft = '';
 
-// ── Logging ────────────────────────────────────────────────────────────────
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+let activeTab = 'config';
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const target = tab.dataset.tab;
+    if (target === activeTab) return;
+    activeTab = target;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + target));
+    if (target === 'config' && port) sendCommand('show');
+    if (target === 'cli')    setTimeout(() => cmdInput.focus(), 0);
+  });
+});
+
+// ── Logging (CLI terminal) ────────────────────────────────────────────────────
 function log(text, cls = '') {
-  // flush any buffered partial line first if switching classes
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     if (i < lines.length - 1 || lines[i] !== '') {
@@ -207,7 +391,23 @@ function log(text, cls = '') {
   terminal.scrollTop = terminal.scrollHeight;
 }
 
-// ── Connect / disconnect ───────────────────────────────────────────────────
+// ── Config line parser ────────────────────────────────────────────────────────
+function parseConfigLine(line) {
+  // "[cfg] disarm_delay    = 5000 ms"  or  "[cfg] stop_on_disarm  = true"
+  const m = line.match(/^\[cfg\]\s+(\w+)\s*=\s*(.+)/);
+  if (!m) return;
+  const key = m[1];
+  const val = m[2].trim();
+
+  if (key === 'disarm_delay') {
+    delayInput.value = parseInt(val) || 0;
+    updateDelayEquiv();
+  } else if (key === 'stop_on_disarm') {
+    stopToggle.checked = (val === 'true');
+  }
+}
+
+// ── Connect / disconnect ──────────────────────────────────────────────────────
 async function connect() {
   try {
     port = await navigator.serial.requestPort();
@@ -227,6 +427,8 @@ async function connect() {
   setConnected(true);
   log(`Connected at ${baudSelect.value} baud`, 'sys');
   startReading();
+  // Populate Easy Config fields after a brief settle time
+  setTimeout(() => sendCommand('show'), 300);
 }
 
 async function disconnect() {
@@ -239,7 +441,7 @@ async function disconnect() {
   log('Disconnected', 'sys');
 }
 
-// ── Read loop ──────────────────────────────────────────────────────────────
+// ── Read loop ─────────────────────────────────────────────────────────────────
 async function startReading() {
   keepReading = true;
   const decoder     = new TextDecoderStream();
@@ -253,15 +455,19 @@ async function startReading() {
       if (done) break;
       lineBuf += value;
       const parts = lineBuf.split('\n');
-      lineBuf = parts.pop();           // last chunk may be incomplete
-      for (const line of parts) log(line.replace(/\r$/, ''));
+      lineBuf = parts.pop();
+      for (const line of parts) {
+        const clean = line.replace(/\r$/, '');
+        log(clean);
+        parseConfigLine(clean);
+      }
     }
   } catch {
     // cancelled or port unplugged
   } finally {
     reader.releaseLock();
     await pipePromise.catch(() => {});
-    if (keepReading) {                 // unexpected loss
+    if (keepReading) {
       port = writer = reader = null;
       setConnected(false);
       log('Connection lost', 'err');
@@ -269,7 +475,7 @@ async function startReading() {
   }
 }
 
-// ── Write ──────────────────────────────────────────────────────────────────
+// ── Write ─────────────────────────────────────────────────────────────────────
 const encoder = new TextEncoder();
 
 async function sendCommand(cmd) {
@@ -282,31 +488,17 @@ async function sendCommand(cmd) {
   }
 }
 
+// ── CLI input ─────────────────────────────────────────────────────────────────
 async function sendCurrent() {
   const cmd = cmdInput.value.trim();
   if (!cmd) return;
   history.unshift(cmd);
   if (history.length > 100) history.pop();
-  histIdx   = -1;
-  histDraft = '';
+  histIdx = -1; histDraft = '';
   cmdInput.value = '';
   await sendCommand(cmd);
 }
 
-// ── UI state ───────────────────────────────────────────────────────────────
-function setConnected(connected) {
-  dot.className          = 'dot' + (connected ? ' connected' : '');
-  statusText.textContent = connected ? 'Connected' : 'Disconnected';
-  statusText.className   = connected ? 'connected' : '';
-  connectBtn.disabled    = connected;
-  disconnectBtn.disabled = !connected;
-  baudSelect.disabled    = connected;
-  cmdInput.disabled      = !connected;
-  sendBtn.disabled       = !connected;
-  if (connected) setTimeout(() => cmdInput.focus(), 0);
-}
-
-// ── Keyboard handling ──────────────────────────────────────────────────────
 cmdInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     sendCurrent();
@@ -319,21 +511,63 @@ cmdInput.addEventListener('keydown', e => {
   } else if (e.key === 'ArrowDown') {
     e.preventDefault();
     if (histIdx > 0) histIdx--;
-    else { histIdx = -1; }
+    else histIdx = -1;
     cmdInput.value = histIdx === -1 ? histDraft : history[histIdx];
     cmdInput.setSelectionRange(cmdInput.value.length, cmdInput.value.length);
   }
 });
 
+// ── Easy Config actions ───────────────────────────────────────────────────────
+readBtn.addEventListener('click', () => sendCommand('show'));
+
+applyBtn.addEventListener('click', async () => {
+  const delay = parseInt(delayInput.value) || 0;
+  const stop  = stopToggle.checked ? 1 : 0;
+  await sendCommand(`set disarm_delay ${delay}`);
+  await sendCommand(`set stop_on_disarm ${stop}`);
+  showSaved();
+});
+
+function showSaved() {
+  savedMsg.textContent = 'Applied';
+  savedMsg.style.opacity = '1';
+  setTimeout(() => { savedMsg.style.opacity = '0'; }, 2500);
+}
+
+delayInput.addEventListener('input', updateDelayEquiv);
+
+function updateDelayEquiv() {
+  const ms = parseInt(delayInput.value) || 0;
+  delayEquiv.textContent = ms === 0 ? '(immediate)' : `= ${(ms / 1000).toFixed(ms % 1000 === 0 ? 0 : 1)} s`;
+}
+
+// ── UI state ──────────────────────────────────────────────────────────────────
+function setConnected(connected) {
+  dot.className          = 'dot' + (connected ? ' connected' : '');
+  statusText.textContent = connected ? 'Connected' : 'Disconnected';
+  statusText.className   = connected ? 'connected' : '';
+  connectBtn.disabled    = connected;
+  disconnectBtn.disabled = !connected;
+  baudSelect.disabled    = connected;
+  cmdInput.disabled      = !connected;
+  sendBtn.disabled       = !connected;
+  readBtn.disabled       = !connected;
+  applyBtn.disabled      = !connected;
+  stopToggle.disabled    = !connected;
+  delayInput.disabled    = !connected;
+}
+
 connectBtn.addEventListener('click', connect);
 disconnectBtn.addEventListener('click', disconnect);
 sendBtn.addEventListener('click', sendCurrent);
 
-// ── Init ───────────────────────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────────
+updateDelayEquiv();
+
 if (!('serial' in navigator)) {
   document.getElementById('noSerial').classList.add('show');
 } else {
-  log('Open a port to begin.  Type "help" for available commands.', 'sys');
+  log('Connect to a device to begin.', 'sys');
 }
 </script>
 </body>
