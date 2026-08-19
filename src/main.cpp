@@ -1,14 +1,19 @@
 #include <Arduino.h>
 #include "config.h"
+#include "config_manager.h"
 #include "ble_camera.h"
 #include "msp_serial.h"
 
-static BLECamera bleCamera;
-static MSPSerial mspSerial;
+static BLECamera     bleCamera;
+static MSPSerial     mspSerial;
+static ConfigManager configManager;
 
 static volatile bool hasBattery = false;
 static BatteryData   currentBattery{};
 static uint32_t      lastBattMs = 0;
+
+static bool     pendingStop = false;
+static uint32_t disarmMs   = 0;
 
 // Called from the BLE stack task — copy + flag only; MSP output on main task.
 static void onBattery(const BatteryData &data) {
@@ -19,11 +24,24 @@ static void onBattery(const BatteryData &data) {
 // Called from mspSerial.update() whenever the FC arm state changes.
 static void onArmStateChange(bool armed) {
     if (armed) {
+        pendingStop = false;
         DBG_SERIAL.println("[main] FC armed — starting recording");
         bleCamera.startRecording();
     } else {
-        DBG_SERIAL.println("[main] FC disarmed — stopping recording");
-        bleCamera.stopRecording();
+        DBG_SERIAL.println("[main] FC disarmed");
+        if (!configManager.config().stopOnDisarm) {
+            DBG_SERIAL.println("[main] stop_on_disarm disabled — keeping recording");
+        } else {
+            const uint32_t delay = configManager.config().disarmStopDelayMs;
+            if (delay == 0) {
+                DBG_SERIAL.println("[main] stopping recording");
+                bleCamera.stopRecording();
+            } else {
+                DBG_SERIAL.printf("[main] stopping recording in %u ms\n", delay);
+                pendingStop = true;
+                disarmMs   = millis();
+            }
+        }
     }
 }
 
@@ -36,6 +54,8 @@ void setup() {
     DBG_SERIAL.printf ("[main] MSP output: UART2 TX=GPIO%d @ %u baud\n",
                        BF_TX_PIN, BF_BAUD);
 
+    configManager.begin(DBG_SERIAL);
+
     mspSerial.begin(BF_SERIAL);
     mspSerial.setArmCallback(onArmStateChange);
 
@@ -44,10 +64,18 @@ void setup() {
 }
 
 void loop() {
+    configManager.update();
     bleCamera.update();
     mspSerial.update();
 
     const uint32_t now = millis();
+
+    // ── Delayed recording stop ─────────────────────────────────────────────
+    if (pendingStop && (now - disarmMs) >= configManager.config().disarmStopDelayMs) {
+        pendingStop = false;
+        DBG_SERIAL.println("[main] stopping recording (delayed)");
+        bleCamera.stopRecording();
+    }
 
     // ── Battery ────────────────────────────────────────────────────────────
     const bool battKeepalive =
