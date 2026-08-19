@@ -58,6 +58,7 @@ void loop() {
     if (hasBattery || battKeepalive) {
         hasBattery = false;
         mspSerial.sendCameraBattery(currentBattery);
+        mspSerial.sendBatteryAsCustomMessage(currentBattery);
         lastBattMs = now;
 
         DBG_SERIAL.printf("[batt] %u%%  %umV  %dmA  %u/%umAh  %d°C  %ucell\n",

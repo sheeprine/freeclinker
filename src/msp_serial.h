@@ -11,6 +11,19 @@
 #define MSP2_SENSOR_BAROMETER       0x1F01
 #define MSP2_SENSOR_MAGNETOMETER    0x1F02
 
+// Betaflight 4.5+ text field setter (see src/main/msp/msp.h in BF source).
+// Payload: textType(1) + text bytes (length from MSP size field, no null).
+#define MSP2_SET_TEXT               0x1031
+
+// Text type values for MSP2_SET_TEXT / MSP2_GET_TEXT
+#define MSP_TEXT_PILOT_NAME         0
+#define MSP_TEXT_CRAFT_NAME         1
+#define MSP_TEXT_PID_PROFILE_NAME   2
+#define MSP_TEXT_RATE_PROFILE_NAME  3
+#define MSP_TEXT_HARDWARE_NAME      4
+#define MSP_TEXT_CUSTOM_1           5   // "Custom Message 1" OSD element
+#define MSP_TEXT_CUSTOM_2           6   // "Custom Message 2" OSD element
+
 // Custom vendor command — carries DJI Action camera battery state.
 // Receivers that don't recognise 0x3001 silently ignore the frame.
 #define MSP2_CAMERA_BATTERY         0x3001
@@ -83,6 +96,9 @@ public:
     // Build and send MSP2_CAMERA_BATTERY (0x3001) from a BatteryData snapshot.
     void sendCameraBattery(const BatteryData &data);
 
+    // Format battery % as "CAM:NNN%" and push as Betaflight Custom Message 1.
+    void sendBatteryAsCustomMessage(const BatteryData &data);
+
     bool isArmed() const { return _armed; }
     void setArmCallback(ArmCallback cb) { _armCb = cb; }
 
@@ -92,6 +108,8 @@ private:
     void sendFrame(uint16_t cmd, const uint8_t *payload, uint16_t length);
     // MSP v2 request frame: $ X < | flag(1) cmd(2LE) size(2LE) [empty] | crc8
     void sendRequest(uint16_t cmd);
+    // MSP2_SET_TEXT helper: type(1) + text bytes
+    void sendCustomText(uint8_t textType, const char *text);
 
     // ── RX parser ─────────────────────────────────────────────────────────
     void feedByte(uint8_t b);

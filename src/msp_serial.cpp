@@ -1,6 +1,7 @@
 #include "msp_serial.h"
 #include "config.h"
 #include <cstring>
+#include <cstdio>
 
 void MSPSerial::begin(HardwareSerial &serial) {
     _serial = &serial;
@@ -188,6 +189,23 @@ void MSPSerial::sendFrame(uint16_t cmd, const uint8_t *payload, uint16_t length)
     _serial->write(sizeHi);
     _serial->write(payload, length);
     _serial->write(crc);
+}
+
+void MSPSerial::sendCustomText(uint8_t textType, const char *text) {
+    const uint8_t textLen = static_cast<uint8_t>(strlen(text));
+    uint8_t buf[1 + 16];   // type + up to 16 chars (OSD Custom Message max)
+    buf[0] = textType;
+    memcpy(buf + 1, text, textLen);
+    sendFrame(MSP2_SET_TEXT, buf, 1 + textLen);
+}
+
+void MSPSerial::sendBatteryAsCustomMessage(const BatteryData &data) {
+    char text[12];
+    if (data.valid)
+        snprintf(text, sizeof(text), "CAM:%3u%%", data.percent);
+    else
+        snprintf(text, sizeof(text), "CAM:---");
+    sendCustomText(MSP_TEXT_CUSTOM_1, text);
 }
 
 void MSPSerial::sendCameraBattery(const BatteryData &data) {
