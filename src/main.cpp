@@ -6,13 +6,15 @@
 #include "gopro_camera.h"
 #include "msp_serial.h"
 #include "dji_protocol.h"
+#include "web_server.h"
 
 static BLECamera    djiCamera;
 static GoProCamera  goProCamera;
 static Camera      *activeCamera = nullptr;
 
-static MSPSerial     mspSerial;
-static ConfigManager configManager;
+static MSPSerial        mspSerial;
+static ConfigManager    configManager;
+static WebConfigServer  webServer;
 
 static volatile bool hasCamera = false;
 static CameraData    currentCamera{};
@@ -20,6 +22,11 @@ static uint32_t      lastBattMs = 0;
 
 static bool     pendingStop = false;
 static uint32_t disarmMs   = 0;
+
+// Timestamp used to compute the WiFi AP start delay.
+// Reset to millis() whenever a camera disconnects so the countdown restarts.
+static uint32_t wifiDelayOriginMs = 0;
+static bool     cameraWasConnected = false;
 
 static void onAuxSwitch(bool high) {
     const bool isGoPro = (configManager.config().cameraType == 1);
@@ -81,6 +88,8 @@ void setup() {
     DBG_SERIAL.printf("[main] Camera type: %s\n", useGoPro ? "GoPro" : "DJI Action");
     DBG_SERIAL.printf("[main] MSP output: UART2 TX=GPIO%d @ %u baud\n",
                       BF_TX_PIN, BF_BAUD);
+    DBG_SERIAL.printf("[main] WiFi AP '%s' starts in %u s if no camera connects\n",
+                      WIFI_AP_SSID, WIFI_AP_START_DELAY_MS / 1000);
 
     mspSerial.begin(BF_SERIAL);
     mspSerial.setArmCallback(onArmStateChange);
@@ -88,6 +97,8 @@ void setup() {
 
     activeCamera->setCameraCallback(onCameraData);
     activeCamera->begin();
+
+    wifiDelayOriginMs = millis();
 }
 
 void loop() {
@@ -96,7 +107,34 @@ void loop() {
     activeCamera->update();
     mspSerial.update();
 
-    const uint32_t now = millis();
+    const uint32_t now          = millis();
+    const bool     camConnected = activeCamera->isConnected();
+
+    // ── WiFi AP lifecycle ──────────────────────────────────────────────────────
+    if (camConnected && !cameraWasConnected) {
+        // Camera just connected — tear down the AP if it is running.
+        if (webServer.isRunning()) {
+            DBG_SERIAL.println("[wifi] Camera connected — stopping AP");
+            webServer.stop();
+        }
+    }
+
+    if (!camConnected && cameraWasConnected) {
+        // Camera just disconnected — restart the countdown.
+        DBG_SERIAL.printf("[wifi] Camera disconnected — AP starts in %u s\n",
+                          WIFI_AP_START_DELAY_MS / 1000);
+        wifiDelayOriginMs = now;
+    }
+
+    cameraWasConnected = camConnected;
+
+    if (!webServer.isRunning() && !camConnected &&
+        WIFI_AP_START_DELAY_MS > 0 &&
+        (now - wifiDelayOriginMs) >= WIFI_AP_START_DELAY_MS) {
+        webServer.begin(configManager, &DBG_SERIAL);
+    }
+
+    webServer.update();
 
     // ── Delayed recording stop ─────────────────────────────────────────────────
     if (pendingStop && (now - disarmMs) >= configManager.config().disarmStopDelayMs) {

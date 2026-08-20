@@ -25,11 +25,21 @@ public:
 
     const Config &config() const { return _cfg; }
 
+    // Process a single CLI command, writing response to `out`.
+    void processCommand(const char *line, Stream &out);
+
+    // Individual setters — each persists to NVS immediately.
+    void setCameraType(uint8_t v);
+    void setDisarmDelay(uint32_t ms);
+    void setStopOnDisarm(bool v);
+    void setAuxChannel(uint8_t ch);
+    void setAuxMode(uint8_t mode);
+
 private:
     void load();
     void save();
-    void printAll();
-    void handleLine(const char *line);
+    void printAll(Stream &out);
+    void handleLine(const char *line, Stream &out);
 
     Preferences _prefs;
     Config      _cfg{};

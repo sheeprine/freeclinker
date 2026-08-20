@@ -39,3 +39,13 @@
 // Camera pushes status at 2 Hz once subscribed; this keepalive only fires
 // if the camera goes silent (sleep mode, etc.).
 #define MSP_BATTERY_KEEPALIVE_MS    2000
+
+// ─── WiFi AP (configuration web interface) ───────────────────────────────────
+//
+// The AP starts automatically this many ms after boot if no camera has
+// connected yet (or after a camera disconnects).  Set to 0 to disable.
+//
+#define WIFI_AP_SSID              "FreeCLinker"
+#define WIFI_AP_PASSWORD          ""              // empty = open network
+#define WIFI_AP_CHANNEL           1
+#define WIFI_AP_START_DELAY_MS    30000           // 30 s
