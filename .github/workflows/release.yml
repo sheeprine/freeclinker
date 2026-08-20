@@ -1,0 +1,51 @@
+name: Release Firmware
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build esp32dev
+        run: pio run -e esp32dev
+
+      - name: Build esp32c3supermini
+        run: pio run -e esp32c3supermini
+
+      - name: Collect firmware artifacts
+        run: |
+          mkdir -p firmware
+          cp .pio/build/esp32dev/bootloader.bin           firmware/bootloader-esp32dev.bin
+          cp .pio/build/esp32dev/partitions.bin           firmware/partitions-esp32dev.bin
+          cp .pio/build/esp32dev/firmware.bin             firmware/firmware-esp32dev.bin
+          cp .pio/build/esp32c3supermini/bootloader.bin   firmware/bootloader-esp32c3supermini.bin
+          cp .pio/build/esp32c3supermini/partitions.bin   firmware/partitions-esp32c3supermini.bin
+          cp .pio/build/esp32c3supermini/firmware.bin     firmware/firmware-esp32c3supermini.bin
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: firmware/*
+          generate_release_notes: true

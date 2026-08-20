@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreeCLinker — Flash Firmware</title>
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #141414;
+      color: #d4d4d4;
+      font: 14px/1.5 'Courier New', monospace;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 16px;
+      background: #1e1e1e;
+      border-bottom: 1px solid #2d2d2d;
+      flex-shrink: 0;
+    }
+
+    .brand { font-size: 13px; font-weight: bold; color: #60a5fa; margin-right: auto; }
+
+    a { color: #60a5fa; text-decoration: none; font-size: 12px; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Main ────────────────────────────────────────────────────────────────── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px;
+      gap: 16px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 520px;
+      background: #1e1e1e;
+      border: 1px solid #2d2d2d;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 20px;
+      border-bottom: 1px solid #2d2d2d;
+    }
+    .card-header h1 { font-size: 13px; color: #9ca3af; font-weight: normal; letter-spacing: 0.05em; text-transform: uppercase; }
+
+    .card-body { padding: 20px; }
+
+    /* ── Release info ────────────────────────────────────────────────────────── */
+    .release-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .version { font-size: 20px; color: #60a5fa; }
+    .rel-date { font-size: 11px; color: #6b7280; }
+
+    /* ── Board cards ─────────────────────────────────────────────────────────── */
+    .section-label {
+      font-size: 11px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+
+    .board-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .board-card {
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      user-select: none;
+    }
+    .board-card:hover { border-color: #555; background: #242424; }
+    .board-card.selected { border-color: #2563eb; background: #162036; }
+
+    .board-name { font-size: 13px; color: #e2e8f0; margin-bottom: 3px; }
+    .board-desc { font-size: 11px; color: #6b7280; line-height: 1.4; }
+
+    /* ── Flash section ───────────────────────────────────────────────────────── */
+    .flash-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      padding-top: 20px;
+      border-top: 1px solid #252525;
+    }
+
+    /* Override ESP Web Tools button */
+    esp-web-install-button::part(button) {
+      font: 14px/1.5 'Courier New', monospace;
+      padding: 8px 24px;
+      border-radius: 4px;
+      border: 1px solid #2563eb;
+      background: #1d4ed8;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    esp-web-install-button::part(button):hover { background: #2563eb; }
+
+    .flash-btn {
+      font: 14px/1.5 'Courier New', monospace;
+      padding: 8px 28px;
+      border-radius: 4px;
+      border: 1px solid #2563eb;
+      background: #1d4ed8;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .flash-btn:hover { background: #2563eb; }
+    .flash-btn:disabled { opacity: 0.35; cursor: default; }
+
+    .note {
+      font-size: 11px;
+      color: #6b7280;
+      text-align: center;
+      line-height: 1.7;
+      max-width: 380px;
+    }
+
+    /* ── Spinner ─────────────────────────────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border: 2px solid #3a3a3a;
+      border-top-color: #60a5fa;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .err { color: #f87171; font-size: 13px; }
+
+    /* ── No-serial overlay ───────────────────────────────────────────────────── */
+    #noSerial {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #141414ee;
+      place-items: center;
+      font-size: 15px;
+      color: #f87171;
+      text-align: center;
+      line-height: 2;
+    }
+    #noSerial.show { display: grid; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="brand">FreeCLinker</span>
+  <a href="index.html">Config UI</a>
+  <a href="https://github.com/sheeprine/freeclinker" target="_blank" rel="noopener">GitHub</a>
+</header>
+
+<main>
+  <div class="card">
+    <div class="card-header">
+      <h1>Flash Firmware</h1>
+      <a id="releaseLink" href="https://github.com/sheeprine/freeclinker/releases" target="_blank" rel="noopener" style="font-size:11px; color:#6b7280;">All releases ↗</a>
+    </div>
+    <div class="card-body">
+
+      <!-- Release info -->
+      <div class="release-row">
+        <span class="version" id="version"><span class="spinner"></span>Loading…</span>
+        <span class="rel-date" id="relDate"></span>
+      </div>
+
+      <!-- Board selection -->
+      <div class="section-label">Select your board</div>
+      <div class="board-grid">
+        <div class="board-card selected" data-target="esp32dev">
+          <div class="board-name">ESP32 Dev Board</div>
+          <div class="board-desc">Standard 38-pin WROOM/WROVER module</div>
+        </div>
+        <div class="board-card" data-target="esp32c3supermini">
+          <div class="board-name">ESP32-C3 Super Mini</div>
+          <div class="board-desc">Compact RISC-V board (USB CDC)</div>
+        </div>
+      </div>
+
+      <!-- Flash action -->
+      <div class="flash-section">
+        <esp-web-install-button id="installBtn">
+          <button class="flash-btn" slot="activate">Connect &amp; Flash</button>
+        </esp-web-install-button>
+        <p class="note">
+          Requires <strong>Chrome</strong> or <strong>Edge</strong> (desktop).<br>
+          ESP32-C3: hold <strong>BOOT</strong> while plugging in to enter download mode.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<div id="noSerial">
+  <div>
+    Web Serial API is not available.<br>
+    Please use <strong>Chrome</strong> or <strong>Edge</strong> (desktop).
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const REPO       = 'sheeprine/freeclinker';
+const GH_DL      = `https://github.com/${REPO}/releases/latest/download`;
+const GH_API     = `https://api.github.com/repos/${REPO}/releases/latest`;
+
+const TARGETS = {
+  esp32dev: {
+    chipFamily: 'ESP32',
+    parts: [
+      { path: `${GH_DL}/bootloader-esp32dev.bin`, offset: 0x1000 },
+      { path: `${GH_DL}/partitions-esp32dev.bin`, offset: 0x8000 },
+      { path: `${GH_DL}/firmware-esp32dev.bin`,   offset: 0x10000 },
+    ],
+  },
+  esp32c3supermini: {
+    chipFamily: 'ESP32-C3',
+    parts: [
+      { path: `${GH_DL}/bootloader-esp32c3supermini.bin`, offset: 0x0 },
+      { path: `${GH_DL}/partitions-esp32c3supermini.bin`, offset: 0x8000 },
+      { path: `${GH_DL}/firmware-esp32c3supermini.bin`,   offset: 0x10000 },
+    ],
+  },
+};
+
+let selectedTarget  = 'esp32dev';
+let currentVersion  = 'unknown';
+let manifestBlobUrl = null;
+
+const installBtn = document.getElementById('installBtn');
+const versionEl  = document.getElementById('version');
+const relDateEl  = document.getElementById('relDate');
+
+// Board card selection
+document.querySelectorAll('.board-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.board-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedTarget = card.dataset.target;
+    applyManifest();
+  });
+});
+
+function applyManifest() {
+  if (manifestBlobUrl) URL.revokeObjectURL(manifestBlobUrl);
+  const manifest = {
+    name:                     'FreeCLinker',
+    version:                  currentVersion,
+    new_install_prompt_erase: true,
+    builds:                   [TARGETS[selectedTarget]],
+  };
+  const blob       = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+  manifestBlobUrl  = URL.createObjectURL(blob);
+  installBtn.setAttribute('manifest', manifestBlobUrl);
+}
+
+// Fetch latest release metadata from GitHub API
+fetch(GH_API)
+  .then(r => r.ok ? r.json() : Promise.reject(r.status))
+  .then(rel => {
+    currentVersion          = rel.tag_name;
+    versionEl.textContent   = rel.tag_name;
+    versionEl.removeAttribute('class');
+    versionEl.className     = 'version';
+    const d                 = new Date(rel.published_at);
+    relDateEl.textContent   = `Released ${d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' })}`;
+    document.getElementById('releaseLink').href = rel.html_url;
+    applyManifest();
+  })
+  .catch(() => {
+    versionEl.innerHTML = '<span class="err">Could not fetch release info</span>';
+    applyManifest();
+  });
+
+// Web Serial API availability check
+if (!('serial' in navigator)) {
+  document.getElementById('noSerial').classList.add('show');
+}
+</script>
+</body>
+</html>

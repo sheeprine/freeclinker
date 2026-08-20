@@ -69,6 +69,14 @@ Type `help` in the serial console to list all commands, `show` to print current 
 
 Open `web/index.html` directly in **Chrome or Edge** (no server required). Connect to the ESP32 via the browser's Web Serial dialog to get a graphical config panel and an interactive CLI terminal.
 
+## Flashing from the browser
+
+Open `web/flash.html` in Chrome or Edge to flash the latest firmware release directly from your browser — no toolchain required. Select your board (ESP32 Dev Board or ESP32-C3 Super Mini), click **Connect & Flash**, and pick the serial port.
+
+The page fetches the firmware binaries from the latest [GitHub release](https://github.com/sheeprine/freeclinker/releases) automatically.
+
+> **ESP32-C3**: hold the **BOOT** button while plugging in to enter download mode.
+
 ## Building and flashing
 
 Requires [PlatformIO](https://platformio.org/).
