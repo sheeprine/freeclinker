@@ -74,11 +74,19 @@ To display camera telemetry in the OSD, go to the **OSD** tab and enable:
 
 ## 3. Build and flash
 
-### Prerequisites
+### Flash from the browser (easiest)
+
+No toolchain needed. Open **[sheeprine.github.io/freeclinker/flash.html](https://sheeprine.github.io/freeclinker/flash.html)** in Chrome or Edge, select your board, click **Connect & Flash**, and pick the serial port.
+
+> **ESP32-C3**: hold the **BOOT** button while plugging in to enter download mode.
+
+### Build from source
+
+#### Prerequisites
 
 Install [PlatformIO Core](https://docs.platformio.org/en/latest/core/installation/index.html) (CLI) or the PlatformIO extension for VS Code.
 
-### Clone and build
+#### Clone and build
 
 ```bash
 git clone https://github.com/your-org/freeclinker.git
@@ -128,19 +136,21 @@ The change is persisted across reboots. A reboot is required for `camera_type` t
 
 ## 5. Web interface
 
-The `web/index.html` file is a standalone configuration page that uses the **Web Serial API** — no server required.
+The configuration UI uses the **Web Serial API** and works in **Chrome** or **Edge** (desktop). Firefox does not support Web Serial.
 
 ### Open it
 
-1. In your file manager or terminal, open `web/index.html` directly in **Chrome** or **Edge** (desktop). Firefox does not support Web Serial.
+**Hosted:** open **[sheeprine.github.io/freeclinker](https://sheeprine.github.io/freeclinker/)** directly in Chrome or Edge.
 
-   ```bash
-   open web/index.html          # macOS
-   start web/index.html         # Windows
-   xdg-open web/index.html      # Linux
-   ```
+**Local:** open `web/index.html` from the cloned repo:
 
-2. Click **Connect**, select the ESP32 serial port from the browser dialog, and confirm at **115200** baud.
+```bash
+open web/index.html          # macOS
+start web/index.html         # Windows
+xdg-open web/index.html      # Linux
+```
+
+Click **Connect**, select the ESP32 serial port from the browser dialog, and confirm at **115200** baud.
 
 ### Easy Config tab
 
