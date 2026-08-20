@@ -22,6 +22,17 @@ static bool     pendingStop = false;
 static uint32_t disarmMs   = 0;
 
 static void onAuxSwitch(bool high) {
+    const bool isGoPro = (configManager.config().cameraType == 1);
+    if (isGoPro && currentCamera.recording) {
+        if (high) {
+            DBG_SERIAL.println("[main] AUX high + GoPro recording → Burst Slo-Mo");
+            activeCamera->triggerBurstSloMo();
+        } else {
+            DBG_SERIAL.println("[main] AUX low + GoPro recording → Standard");
+            activeCamera->exitBurstSloMo();
+        }
+        return;
+    }
     const uint8_t mode = high ? configManager.config().auxMode : DJI_MODE_VIDEO;
     DBG_SERIAL.printf("[main] AUX %s → camera mode 0x%02X\n", high ? "high" : "low", mode);
     activeCamera->switchCameraMode(mode);

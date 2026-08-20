@@ -172,6 +172,29 @@ bool GoProCamera::connectAndSetup() {
         return false;
     }
 
+    // GP-0074: setting write
+    _settingChar = svc->getCharacteristic(BLEUUID(GP_CHAR_SETTING_WRITE));
+    if (!_settingChar || !_settingChar->canWrite()) {
+        DBG_SERIAL.println("[BLE] Setting write char GP-0074 not found");
+        _client->disconnect();
+        _targetFound   = false;
+        _lastAttemptMs = millis();
+        return false;
+    }
+
+    // GP-0075: setting response notify
+    BLERemoteCharacteristic *settingNotify =
+        svc->getCharacteristic(BLEUUID(GP_CHAR_SETTING_NOTIFY));
+    if (!settingNotify || !settingNotify->canNotify()) {
+        DBG_SERIAL.println("[BLE] Setting notify char GP-0075 not found");
+        _client->disconnect();
+        _targetFound   = false;
+        _lastAttemptMs = millis();
+        return false;
+    }
+    settingNotify->registerForNotify(settingNotifyCallback);
+    DBG_SERIAL.println("[BLE] Subscribed to GP-0075 (setting notify)");
+
     // GP-0076: query write
     _queryChar = svc->getCharacteristic(BLEUUID(GP_CHAR_QUERY_WRITE));
     if (!_queryChar || !_queryChar->canWrite()) {
@@ -199,14 +222,24 @@ void GoProCamera::onDisconnect(BLEClient * /*c*/) {
     _gpConnected   = false;
     _bleConnected  = false;
     _cmdChar       = nullptr;
+    _settingChar   = nullptr;
     _queryChar     = nullptr;
     _targetFound   = false;
     _lastAttemptMs = millis();
     _cmdRx.reset();
+    _settingRx.reset();
     _queryRx.reset();
 }
 
 // ─── GoPro commands ───────────────────────────────────────────────────────────
+
+// Writes a setting to GP-0074.
+// Packet: [header(1), setting_id(1), value_length=1(1), value(1)]
+void GoProCamera::sendSetting(uint8_t setting_id, uint8_t value) {
+    if (!_settingChar) return;
+    uint8_t buf[] = {0x03, setting_id, 0x01, value};
+    _settingChar->writeValue(buf, sizeof(buf), false);
+}
 
 // Sends a TLV-encoded command to GP-0072.
 // Packet: [header(1), cmd_id(1), param_len(1), param_val...]
@@ -276,6 +309,21 @@ bool GoProCamera::stopRecording() {
     return true;
 }
 
+bool GoProCamera::triggerBurstSloMo() {
+    if (!_gpConnected) return false;
+    // Setting 239 (General Sub Mode) = 32 (Burst Slo-Mo). Requires Mission 1 Pro.
+    sendSetting(GP_SETTING_GENERAL_SUB_MODE, GP_SUB_MODE_BURST_SLOMO);
+    DBG_SERIAL.println("[GP] Sub-mode → Burst Slo-Mo sent");
+    return true;
+}
+
+bool GoProCamera::exitBurstSloMo() {
+    if (!_gpConnected) return false;
+    sendSetting(GP_SETTING_GENERAL_SUB_MODE, GP_SUB_MODE_STANDARD);
+    DBG_SERIAL.println("[GP] Sub-mode → Standard sent");
+    return true;
+}
+
 bool GoProCamera::switchCameraMode(uint8_t dji_mode) {
     // Map DJI_MODE_* → GoPro preset group
     uint8_t group;
@@ -298,6 +346,11 @@ void GoProCamera::cmdNotifyCallback(BLERemoteCharacteristic * /*ch*/,
     if (_instance) _instance->handleCmdNotification(data, len);
 }
 
+void GoProCamera::settingNotifyCallback(BLERemoteCharacteristic * /*ch*/,
+                                         uint8_t *data, size_t len, bool /*isNotify*/) {
+    if (_instance) _instance->handleSettingNotification(data, len);
+}
+
 void GoProCamera::queryNotifyCallback(BLERemoteCharacteristic * /*ch*/,
                                        uint8_t *data, size_t len, bool /*isNotify*/) {
     if (_instance) _instance->handleQueryNotification(data, len);
@@ -308,6 +361,11 @@ void GoProCamera::queryNotifyCallback(BLERemoteCharacteristic * /*ch*/,
 void GoProCamera::handleCmdNotification(uint8_t *data, size_t len) {
     if (_cmdRx.feed(data, len))
         handleCmdMessage(_cmdRx.buf, _cmdRx.expected);
+}
+
+void GoProCamera::handleSettingNotification(uint8_t *data, size_t len) {
+    if (_settingRx.feed(data, len))
+        handleSettingMessage(_settingRx.buf, _settingRx.expected);
 }
 
 void GoProCamera::handleQueryNotification(uint8_t *data, size_t len) {
@@ -340,6 +398,17 @@ void GoProCamera::handleCmdMessage(const uint8_t *msg, size_t len) {
         else
             DBG_SERIAL.printf("[GP] Preset group rejected: 0x%02X\n", status);
     }
+}
+
+// Setting write response: [setting_id, status]
+void GoProCamera::handleSettingMessage(const uint8_t *msg, size_t len) {
+    if (len < 2) return;
+    uint8_t setting_id = msg[0];
+    uint8_t status     = msg[1];
+    if (status == 0)
+        DBG_SERIAL.printf("[GP] Setting %u OK\n", setting_id);
+    else
+        DBG_SERIAL.printf("[GP] Setting %u rejected: 0x%02X\n", setting_id, status);
 }
 
 // Assembled query response / status notification:

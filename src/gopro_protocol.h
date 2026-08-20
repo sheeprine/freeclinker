@@ -7,10 +7,12 @@
 #define GP_SERVICE_UUID          0xFEA6  // 16-bit, used for scan filtering
 
 // 128-bit characteristic UUIDs (base: b5f9XXXX-aa8d-11e3-9046-0002a5d5c51b)
-#define GP_CHAR_CMD_WRITE   "b5f90072-aa8d-11e3-9046-0002a5d5c51b"  // ESP32 → camera
-#define GP_CHAR_CMD_NOTIFY  "b5f90073-aa8d-11e3-9046-0002a5d5c51b"  // camera → ESP32 (cmd ack)
-#define GP_CHAR_QUERY_WRITE "b5f90076-aa8d-11e3-9046-0002a5d5c51b"  // ESP32 → camera (query)
-#define GP_CHAR_QUERY_NOTIFY "b5f90077-aa8d-11e3-9046-0002a5d5c51b" // camera → ESP32 (status)
+#define GP_CHAR_CMD_WRITE      "b5f90072-aa8d-11e3-9046-0002a5d5c51b"  // ESP32 → camera
+#define GP_CHAR_CMD_NOTIFY     "b5f90073-aa8d-11e3-9046-0002a5d5c51b"  // camera → ESP32 (cmd ack)
+#define GP_CHAR_SETTING_WRITE  "b5f90074-aa8d-11e3-9046-0002a5d5c51b"  // ESP32 → camera (settings)
+#define GP_CHAR_SETTING_NOTIFY "b5f90075-aa8d-11e3-9046-0002a5d5c51b"  // camera → ESP32 (setting ack)
+#define GP_CHAR_QUERY_WRITE    "b5f90076-aa8d-11e3-9046-0002a5d5c51b"  // ESP32 → camera (query)
+#define GP_CHAR_QUERY_NOTIFY   "b5f90077-aa8d-11e3-9046-0002a5d5c51b"  // camera → ESP32 (status)
 
 // Manufacturer company ID for scan identification (little-endian: 0x02, 0xF2)
 #define GP_MANUFACTURER_ID_LO  0x02
@@ -27,6 +29,27 @@
 #define GP_PRESET_VIDEO       0x00
 #define GP_PRESET_PHOTO       0x01
 #define GP_PRESET_TIMELAPSE   0x02
+
+// ─── Setting IDs written to GP_CHAR_SETTING_WRITE; ack on GP_CHAR_SETTING_NOTIFY ─
+// Wire format: [header=(payload_len & 0x1F), setting_id(1), value_length(1), value...]
+
+#define GP_SETTING_GENERAL_SUB_MODE  239  // UInt8; selects sub-mode within current mode
+
+// Values for GP_SETTING_GENERAL_SUB_MODE (setting 239)
+// Available options depend on the active preset group.
+#define GP_SUB_MODE_STANDARD    12
+#define GP_SUB_MODE_STATIONARY  13
+#define GP_SUB_MODE_LOOPING     15
+#define GP_SUB_MODE_PHOTO       16
+#define GP_SUB_MODE_BURST       19
+#define GP_SUB_MODE_MOTION      24
+#define GP_SUB_MODE_SLOMO       27
+#define GP_SUB_MODE_STAR_TRAILS 29
+#define GP_SUB_MODE_LIGHT_PAINT 30
+#define GP_SUB_MODE_VEHICLE_LTS 31
+#define GP_SUB_MODE_BURST_SLOMO 32   // Mission 1 Pro only
+#define GP_SUB_MODE_LOW_LIGHT   36
+#define GP_SUB_MODE_INTERVAL    100
 
 // ─── Query IDs (sent to GP_CHAR_QUERY_WRITE, response on GP_CHAR_QUERY_NOTIFY) ─
 

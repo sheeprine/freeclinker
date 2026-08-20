@@ -32,6 +32,8 @@ public:
     bool stopRecording() override;
     // mode is a DJI_MODE_* constant; GoProCamera maps it to a GoPro preset group.
     bool switchCameraMode(uint8_t mode) override;
+    bool triggerBurstSloMo() override;
+    bool exitBurstSloMo() override;
 
 private:
     // BLE stack callbacks
@@ -45,27 +47,33 @@ private:
 
     // ── GoPro commands ────────────────────────────────────────────────────────
     void sendCmd(uint8_t cmd_id, const uint8_t *params, uint8_t param_len);
+    void sendSetting(uint8_t setting_id, uint8_t value);
     void sendHardwareInfoQuery();
     void sendRegisterQuery();
 
     // ── Notification handling ─────────────────────────────────────────────────
     void handleCmdNotification(uint8_t *data, size_t len);
+    void handleSettingNotification(uint8_t *data, size_t len);
     void handleQueryNotification(uint8_t *data, size_t len);
     void handleCmdMessage(const uint8_t *msg, size_t len);
+    void handleSettingMessage(const uint8_t *msg, size_t len);
     void handleQueryMessage(const uint8_t *msg, size_t len);
     void parseStatusTlv(const uint8_t *tlv, size_t len);
 
     // ── Static trampolines ────────────────────────────────────────────────────
     static void cmdNotifyCallback(BLERemoteCharacteristic *pChar,
                                    uint8_t *data, size_t len, bool isNotify);
+    static void settingNotifyCallback(BLERemoteCharacteristic *pChar,
+                                       uint8_t *data, size_t len, bool isNotify);
     static void queryNotifyCallback(BLERemoteCharacteristic *pChar,
                                      uint8_t *data, size_t len, bool isNotify);
     static void scanDoneCallback(BLEScanResults results);
 
     // ── State ─────────────────────────────────────────────────────────────────
-    BLEClient               *_client    = nullptr;
-    BLERemoteCharacteristic *_cmdChar   = nullptr;  // GP-0072: command write
-    BLERemoteCharacteristic *_queryChar = nullptr;  // GP-0076: query write
+    BLEClient               *_client       = nullptr;
+    BLERemoteCharacteristic *_cmdChar     = nullptr;  // GP-0072: command write
+    BLERemoteCharacteristic *_settingChar = nullptr;  // GP-0074: setting write
+    BLERemoteCharacteristic *_queryChar   = nullptr;  // GP-0076: query write
     std::string              _targetAddr;
     esp_ble_addr_type_t      _targetType  = BLE_ADDR_TYPE_PUBLIC;
     bool                     _targetFound = false;
@@ -80,6 +88,7 @@ private:
 
     // Packet reassemblers for each notify characteristic
     GpRxAssembler _cmdRx;
+    GpRxAssembler _settingRx;
     GpRxAssembler _queryRx;
 
     CameraData _camera{};

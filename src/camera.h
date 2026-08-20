@@ -15,6 +15,10 @@ public:
     virtual bool stopRecording() = 0;
     // mode uses DJI_MODE_* constants; each implementation maps as needed.
     virtual bool switchCameraMode(uint8_t mode) = 0;
+    // Trigger a burst slow-motion capture (GoPro only; no-op on other cameras).
+    virtual bool triggerBurstSloMo() { return false; }
+    // Return to standard sub-mode after a burst slow-motion capture.
+    virtual bool exitBurstSloMo() { return false; }
 
     void setCameraCallback(CameraCallback cb) { _cameraCb = cb; }
 
