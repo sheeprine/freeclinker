@@ -1,6 +1,8 @@
 # DJI Action / GoPro → Betaflight Bridge
 
-ESP32 firmware that connects a DJI Action or GoPro camera to a Betaflight flight controller. The ESP32 bridges the two devices: it receives camera telemetry over BLE and forwards it to the FC via MSP serial, and automatically starts/stops camera recording when the FC arms or disarms.
+ESP32 firmware that connects a DJI Action or GoPro camera to a Betaflight flight controller.
+
+**→ [Quickstart guide](QUICKSTART.md)** — wiring, build, flash, and web interface setup. The ESP32 bridges the two devices: it receives camera telemetry over BLE and forwards it to the FC via MSP serial, and automatically starts/stops camera recording when the FC arms or disarms.
 
 ## How it works
 
@@ -59,6 +61,10 @@ Runtime settings are changed via the USB serial console and persisted across reb
 | `set aux_mode <0x##>` | 0x00 | Camera mode when AUX is high (`0x00`=slow-motion, `0x01`=video, `0x0A`=hyperlapse). On GoPro, when already recording, AUX high/low triggers Burst Slo-Mo instead of switching presets. |
 
 Type `help` in the serial console to list all commands, `show` to print current settings.
+
+## Web interface
+
+Open `web/index.html` directly in **Chrome or Edge** (no server required). Connect to the ESP32 via the browser's Web Serial dialog to get a graphical config panel and an interactive CLI terminal.
 
 ## Building and flashing
 
