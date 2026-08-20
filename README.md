@@ -1,15 +1,15 @@
-# DJI Action → Betaflight Bridge
+# DJI Action / GoPro → Betaflight Bridge
 
-ESP32 firmware that connects a DJI Action camera to a Betaflight flight controller. The ESP32 bridges the two devices: it receives camera telemetry over BLE and forwards it to the FC via MSP serial, and automatically starts/stops camera recording when the FC arms or disarms.
+ESP32 firmware that connects a DJI Action or GoPro camera to a Betaflight flight controller. The ESP32 bridges the two devices: it receives camera telemetry over BLE and forwards it to the FC via MSP serial, and automatically starts/stops camera recording when the FC arms or disarms.
 
 ## How it works
 
 ```
-DJI Action Camera ←—BLE—→ ESP32 ←—MSP Serial—→ Betaflight FC
+DJI Action / GoPro Camera ←—BLE—→ ESP32 ←—MSP Serial—→ Betaflight FC
 ```
 
-1. The ESP32 scans for a DJI Action camera and establishes a BLE connection.
-2. It subscribes to camera status pushes at 2 Hz, receiving battery percentage and recording state.
+1. The ESP32 scans for a supported camera and establishes a BLE connection.
+2. It subscribes to camera status updates, receiving battery percentage, recording state, and more.
 3. It polls the flight controller every 100 ms for arm state via `MSP_STATUS`.
 4. On arm, it sends a recording-start command to the camera. On disarm, recording stops.
 5. Battery and recording state are continuously forwarded to Betaflight as OSD telemetry.
@@ -44,8 +44,19 @@ All tunable parameters are in `include/config.h`:
 | `BF_BAUD` | 115200 | MSP serial baud rate |
 | `BLE_SCAN_DURATION_SECS` | 5 | BLE scan window |
 | `BLE_RECONNECT_DELAY_MS` | 3000 | Backoff after failed connection |
-| `MSP_KEEPALIVE_MS` | 500 | GPS telemetry resend interval |
 | `MSP_BATTERY_KEEPALIVE_MS` | 2000 | Battery telemetry resend interval |
+
+Runtime settings are changed via the USB serial console and persisted across reboots:
+
+| Command | Default | Description |
+|---------|---------|-------------|
+| `set camera_type <0\|1>` | 0 | Camera protocol: 0 = DJI, 1 = GoPro (reboot to apply) |
+| `set stop_on_disarm <0\|1>` | 1 | Stop recording on FC disarm |
+| `set disarm_delay <ms>` | 0 | Delay between disarm and recording stop |
+| `set aux_channel <0-12>` | 0 | AUX channel for camera mode switch (0 = off) |
+| `set aux_mode <0x##>` | 0x0A | Camera mode when AUX is high (`0x01`=video, `0x0A`=hyperlapse) |
+
+Type `help` in the serial console to list all commands, `show` to print current settings.
 
 ## Building and flashing
 
@@ -59,4 +70,18 @@ pio device monitor         # View serial debug output
 
 ## Supported cameras
 
-Any DJI Action camera that advertises BLE manufacturer ID `0x08AA` with marker byte `0xFA`, or whose device name contains `"DJI Action"`. Tested with DJI Action series cameras using the DJI proprietary BLE protocol (GATT service `0xFFF0`).
+### DJI Action (default)
+
+Any DJI Action camera that advertises BLE manufacturer ID `0x08AA` with marker byte `0xFA`, or whose device name contains `"DJI Action"`. Uses the DJI proprietary BLE protocol (GATT service `0xFFF0`). Status is pushed at 2 Hz once subscribed.
+
+### GoPro (Open GoPro BLE API)
+
+Any GoPro camera supporting the [Open GoPro BLE API](https://gopro.github.io/OpenGoPro/docs/ble/) (HERO 9 and later). Identified by advertised service UUID `0xFEA6`. Uses standard TLV-encoded commands and registers for push notifications on status changes.
+
+To use a GoPro, connect via serial and run:
+
+```
+set camera_type 1
+```
+
+Then reboot the ESP32. To switch back to DJI: `set camera_type 0` and reboot.
