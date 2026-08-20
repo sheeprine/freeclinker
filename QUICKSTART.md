@@ -6,45 +6,87 @@ This guide walks you through wiring an ESP32 Super Mini to a Betaflight flight c
 
 ## 1. Hardware wiring
 
-Four wires are needed between the ESP32 and the FC. The ESP32 is powered directly from the FC's 5 V (BEC) rail — no separate USB power supply is required on the drone.
+Four wires connect the ESP32 to the FC. The ESP32 is powered from the FC's 5 V rail — no separate USB power supply is needed on the drone.
+
+### ESP32-C3 Super Mini (compact build)
 
 ```
-                    ESP32 Super Mini
-                   ┌──────────────────┐
-                   ┤ 3V3          GND ├── GND ────────────────┐
-                   ┤ GND          IO1 ├                        │
-                   ┤ IO2          IO2 ├                        │
-                   ┤ IO3          IO4 ├                        │
-                   ┤ IO5          IO5 ├                        │
-                   ┤ IO6          IO6 ├                        │
-                   ┤ IO7          IO7 ├                        │
-                   ┤ IO8          IO8 ├                        │
-                   ┤ IO9         IO16 ├── RX ←─────────────────┼──── FC UARTx TX
-                   ┤ IO10        IO17 ├── TX ──────────────────┼──── FC UARTx RX
-                   ┤ IO18        IO18 ├                        │
-                   ┤ IO19        IO19 ├                        │
-             USB ──┤ USB          5V  ├── 5V ──────────────────┼──── FC 5V (BEC)
-                   └──────────────────┘                        │
-                                                               │
-                         Betaflight FC                         │
-                        ┌─────────────────┐                   │
-                        │ UARTx RX  ←────────────── ESP32 TX  │
-                        │ UARTx TX  ─────────────→  ESP32 RX  │
-                        │ GND       ←──────────────────────────┘
-                        │ 5V (BEC)  ──────────────→  ESP32 5V │
-                        └─────────────────┘
+                ESP32-C3 Super Mini
+               ┌──────────────────┐
+               ┤ 3V3         GND  ├── GND ─────────────────────┐
+               ┤ IO2         IO0  ├                             │
+               ┤ IO3         IO1  ├                             │
+         TX ──┤ IO4          5V  ├── 5V ──────────────────────┼──── FC 5V (BEC)
+         RX ──┤ IO5         IO21 ├                             │
+               ┤ IO6         IO20 ├                             │
+               ┤ IO7         IO19 ├                             │
+               ┤ IO8         IO18 ├                             │
+        BOOT ──┤ IO9         IO10 ├                             │
+         USB ──┤ USB              ├                             │
+               └──────────────────┘                             │
+                                                                │
+                     Betaflight FC                              │
+                    ┌──────────────────┐                       │
+                    │ UARTx RX  ←──────────── ESP32-C3 IO4 TX  │
+                    │ UARTx TX  ──────────→   ESP32-C3 IO5 RX  │
+                    │ GND       ←────────────────────────────────┘
+                    │ 5V (BEC)  ──────────→   ESP32-C3 5V      │
+                    └──────────────────┘
 ```
 
-| ESP32 pin | FC pin        | Wire colour | Note                         |
-|-----------|---------------|-------------|------------------------------|
-| 5V        | 5V (BEC out)  | Red         | Powers the ESP32             |
-| GND       | GND           | Black       | Common ground (required)     |
-| GPIO 17   | UARTx **RX**  | Orange      | MSP data ESP32 → FC          |
-| GPIO 16   | UARTx **TX**  | Yellow      | MSP responses FC → ESP32     |
+| ESP32-C3 pin | FC pin        | Wire colour | Note                          |
+|--------------|---------------|-------------|-------------------------------|
+| 5V           | 5V (BEC out)  | Red         | Powers the ESP32-C3           |
+| GND          | GND           | Black       | Common ground (required)      |
+| IO4 (TX)     | UARTx **RX**  | Orange      | MSP data ESP32-C3 → FC        |
+| IO5 (RX)     | UARTx **TX**  | Yellow      | MSP responses FC → ESP32-C3   |
 
-> **5 V BEC:** Most FCs expose a regulated 5 V pin. Use that pad — do **not** connect to the battery rail (VBAT). The ESP32 Super Mini draws under 200 mA at peak, well within a typical BEC budget.
+> **Download mode (ESP32-C3):** Hold the **BOOT** (IO9) button while plugging in USB to enter the ROM bootloader for flashing. Not needed for normal operation.
+
+### Standard ESP32 Dev Board (38-pin)
+
+```
+                  ESP32 Dev Board
+                 ┌──────────────────┐
+                 ┤ EN          GPIO23├
+                 ┤ GPIO36      GPIO22├
+                 ┤ GPIO39      GPIO1 ├
+                 ┤ GPIO34      GPIO3 ├
+                 ┤ GPIO35      GPIO21├
+                 ┤ GPIO32      GND   ├── GND ───────────────────┐
+                 ┤ GPIO33      GPIO19├                           │
+                 ┤ GPIO25      GPIO18├                           │
+                 ┤ GPIO26      GPIO5 ├                           │
+                 ┤ GPIO27      GPIO17├── TX ────────────────────┼──── FC UARTx RX
+                 ┤ GPIO14      GPIO16├── RX ←───────────────────┼──── FC UARTx TX
+                 ┤ GPIO12      GPIO4 ├                           │
+                 ┤ GND         GPIO0 ├                           │
+                 ┤ GPIO13      GPIO2 ├                           │
+                 ┤ GPIO9       GPIO15├                           │
+                 ┤ GPIO10      GPIO8 ├                           │
+                 ┤ GPIO11      GPIO7 ├                           │
+           USB ──┤ VIN(5V)    GPIO6  ├── 5V ───────────────────┼──── FC 5V (BEC)
+                 └──────────────────┘                           │
+                                                                │
+                     Betaflight FC                              │
+                    ┌──────────────────┐                       │
+                    │ UARTx RX  ←──────────── ESP32 GPIO17 TX  │
+                    │ UARTx TX  ──────────→   ESP32 GPIO16 RX  │
+                    │ GND       ←────────────────────────────────┘
+                    │ 5V (BEC)  ──────────→   ESP32 VIN        │
+                    └──────────────────┘
+```
+
+| ESP32 pin    | FC pin        | Wire colour | Note                       |
+|--------------|---------------|-------------|----------------------------|
+| VIN (5V)     | 5V (BEC out)  | Red         | Powers the ESP32           |
+| GND          | GND           | Black       | Common ground (required)   |
+| GPIO17 (TX)  | UARTx **RX**  | Orange      | MSP data ESP32 → FC        |
+| GPIO16 (RX)  | UARTx **TX**  | Yellow      | MSP responses FC → ESP32   |
+
+> **5 V BEC:** Use the regulated 5 V pad on the FC — do **not** connect to the battery rail (VBAT). Both ESP32 variants draw under 200 mA at peak, well within a typical BEC budget.
 >
-> **USB during flashing:** You can still plug the ESP32's USB-C port in for programming while the 5 V wire is connected. The two power sources will not conflict — the USB 5 V and the BEC 5 V are the same voltage.
+> **USB during flashing:** The ESP32's USB port can stay plugged in while the 5 V wire is connected. Both sources are 5 V and will not conflict.
 
 ---
 
@@ -89,7 +131,7 @@ Install [PlatformIO Core](https://docs.platformio.org/en/latest/core/installatio
 #### Clone and build
 
 ```bash
-git clone https://github.com/your-org/freeclinker.git
+git clone https://github.com/sheeprine/freeclinker.git
 cd freeclinker
 pio run                        # compile
 pio run --target upload        # flash (auto-detects USB port)

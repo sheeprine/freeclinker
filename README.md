@@ -30,16 +30,27 @@ DJI Action / GoPro Camera ←—BLE—→ ESP32 ←—MSP Serial—→ Betafligh
 
 ## Hardware setup
 
-Connect the ESP32 to the Betaflight FC UART:
+Connect the ESP32 to a free Betaflight FC UART. Pin numbers differ by board:
 
-| ESP32 | FC |
-|-------|----|
-| 5V / VCC | 5V |
-| TX (GPIO 17) | RX (any free UART) |
-| RX (GPIO 16) | TX (same UART) |
-| GND | GND |
+**ESP32-C3 Super Mini**
 
-Configure the FC UART for **MSP** at **115200 baud**.
+| ESP32-C3 pin | FC pin        |
+|--------------|---------------|
+| 5V           | 5V (BEC out)  |
+| GND          | GND           |
+| IO4 (TX)     | UARTx **RX**  |
+| IO5 (RX)     | UARTx **TX**  |
+
+**Standard ESP32 Dev Board**
+
+| ESP32 pin   | FC pin        |
+|-------------|---------------|
+| VIN (5V)    | 5V (BEC out)  |
+| GND         | GND           |
+| GPIO17 (TX) | UARTx **RX**  |
+| GPIO16 (RX) | UARTx **TX**  |
+
+Configure the FC UART for **MSP** at **115200 baud**. See [QUICKSTART.md](QUICKSTART.md) for wiring diagrams.
 
 ## Configuration
 
