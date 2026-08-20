@@ -31,17 +31,20 @@ DJI Action / GoPro Camera ←—BLE—→ ESP32 ←—MSP Serial—→ Betafligh
 
 - **`src/dji_protocol.cpp`** — Encodes/decodes DJI BLE frames. DJI uses a non-standard CRC-16 (seed `0x3AA3`) for the header and CRC-32 for the payload. Key command IDs: CmdSet `0x00` CmdID `0x19` (connect), CmdSet `0x1D` CmdID `0x05` (subscribe to status at 2 Hz), CmdSet `0x1D` CmdID `0x02` (status push with battery % and recording state).
 
-- **`src/gopro_camera.cpp`** — `GoProCamera : public Camera`. BLE client for GoPro cameras (Open GoPro BLE API). Scans for service UUID `0xFEA6`, subscribes to GP-0073 (command ack) and GP-0077 (status notify), performs the hardware-info handshake, then registers for push notifications on battery %, encoding state, recording duration, SD remaining, overheating, and preset group. `switchCameraMode` maps DJI_MODE_* constants to GoPro preset groups.
+- **`src/gopro_camera.cpp`** — `GoProCamera : public Camera`. BLE client for GoPro cameras (Open GoPro BLE API). Scans for service UUID `0xFEA6`, subscribes to GP-0073 (command ack) and GP-0077 (status notify), performs the hardware-info handshake, then registers for push notifications on battery %, encoding state, recording duration, SD remaining, overheating, and preset group. `switchCameraMode` maps DJI_MODE_* constants to GoPro preset groups. `triggerBurstSloMo` / `exitBurstSloMo` change the sub-mode setting without switching preset groups (used by the AUX switch when already recording).
 
 - **`src/gopro_protocol.h`** — GoPro BLE constants (service/char UUIDs, command IDs, status IDs) and the `GpRxAssembler` struct for reassembling multi-packet BLE messages.
 
 - **`src/msp_serial.cpp`** — MSP v2 protocol over UART. Polls `MSP_STATUS` (cmd 101) every 100 ms to detect arm state (bit 0 of flight mode flags bytes 6–9). Sends telemetry to Betaflight:
   - `MSP2_CAMERA_BATTERY` (`0x3001`): voltage, current, capacity, temperature
-  - `MSP2_SET_TEXT`: battery % as `"CAM:###%"` (Custom Message 1), recording state as `"REC"` or `"IDLE"` (Custom Message 2)
+  - `MSP2_SET_TEXT` Custom Message 1: battery % (`"CAM:###%"`)
+  - `MSP2_SET_TEXT` Custom Message 2: recording state — `"REC  M:SS"` (with elapsed time), `"IDLE"`, or `"CAM:HOT"` (overheating)
+  - `MSP2_SET_TEXT` Custom Message 3: mode/resolution/FPS/EIS — e.g. `"VID 4K/60 RS+"` (up to 16 chars). Mode codes: `SLO`, `VID`, `TL`, `PHO`, `HYP`.
+  - `MSP2_SET_TEXT` Custom Message 4: remaining record time and SD free space — e.g. `"30m    15.2G"`
 
-- **`src/main.cpp`** — Wires the layers together. Selects the active camera (`BLECamera` or `GoProCamera`) at startup based on the `cameraType` NVS config, then uses it via the `Camera*` interface. On arm state change, triggers camera recording start/stop. Re-sends telemetry on battery update or keepalive timeout.
+- **`src/main.cpp`** — Wires the layers together. Selects the active camera (`BLECamera` or `GoProCamera`) at startup based on the `cameraType` NVS config, then uses it via the `Camera*` interface. On arm state change, triggers camera recording start/stop. Re-sends telemetry on battery update or keepalive timeout. AUX switch: when GoPro is active and recording, high/low triggers `triggerBurstSloMo` / `exitBurstSloMo`; otherwise calls `switchCameraMode` with the configured `auxMode`.
 
-- **`src/config_manager.cpp`** — Runtime configuration via NVS. Parses serial commands (`help`, `show`, `set <key> <val>`, `reset`). Persisted keys: `camera_type` (0=DJI, 1=GoPro), `disarm_delay`, `stop_on_disarm`, `aux_channel`, `aux_mode`.
+- **`src/config_manager.cpp`** — Runtime configuration via NVS. Parses serial commands (`help`, `show`, `set <key> <val>`, `reset`). Persisted keys: `camera_type` (0=DJI, 1=GoPro), `disarm_delay`, `stop_on_disarm`, `aux_channel`, `aux_mode` (default `0x00` = slow motion).
 
 - **`src/telemetry.h`** — Shared `CameraData` struct used by both camera implementations and MSP output.
 

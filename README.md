@@ -20,7 +20,9 @@ DJI Action / GoPro Camera ←—BLE—→ ESP32 ←—MSP Serial—→ Betafligh
 |------|-------------|--------------|
 | Battery voltage, current, capacity, temperature | `MSP2_CAMERA_BATTERY` (0x3001) | — |
 | Battery percentage | `MSP2_SET_TEXT` | Custom Message 1 (`CAM:###%`) |
-| Recording state | `MSP2_SET_TEXT` | Custom Message 2 (`REC` / `IDLE`) |
+| Recording state / time | `MSP2_SET_TEXT` | Custom Message 2 (`REC  0:42` / `IDLE` / `CAM:HOT`) |
+| Mode, resolution, FPS, stabilisation | `MSP2_SET_TEXT` | Custom Message 3 (e.g. `VID 4K/60 RS+`) |
+| Remaining record time and SD free space | `MSP2_SET_TEXT` | Custom Message 4 (e.g. `30m    15.2G`) |
 
 ## Hardware setup
 
@@ -54,7 +56,7 @@ Runtime settings are changed via the USB serial console and persisted across reb
 | `set stop_on_disarm <0\|1>` | 1 | Stop recording on FC disarm |
 | `set disarm_delay <ms>` | 0 | Delay between disarm and recording stop |
 | `set aux_channel <0-12>` | 0 | AUX channel for camera mode switch (0 = off) |
-| `set aux_mode <0x##>` | 0x0A | Camera mode when AUX is high (`0x01`=video, `0x0A`=hyperlapse) |
+| `set aux_mode <0x##>` | 0x00 | Camera mode when AUX is high (`0x00`=slow-motion, `0x01`=video, `0x0A`=hyperlapse). On GoPro, when already recording, AUX high/low triggers Burst Slo-Mo instead of switching presets. |
 
 Type `help` in the serial console to list all commands, `show` to print current settings.
 
