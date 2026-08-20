@@ -239,25 +239,29 @@
 <script>
 'use strict';
 
-const REPO       = 'sheeprine/freeclinker';
-const GH_DL      = `https://github.com/${REPO}/releases/latest/download`;
-const GH_API     = `https://api.github.com/repos/${REPO}/releases/latest`;
+const REPO    = 'sheeprine/freeclinker';
+const GH_API  = `https://api.github.com/repos/${REPO}/releases/latest`;
+
+// Firmware binaries are served from the same origin (no CORS) via
+// the Pages deployment which downloads release assets into firmware/.
+const BASE = window.location.origin + window.location.pathname.replace(/\/[^/]+$/, '');
+const FW   = `${BASE}/firmware`;
 
 const TARGETS = {
   esp32dev: {
     chipFamily: 'ESP32',
     parts: [
-      { path: `${GH_DL}/bootloader-esp32dev.bin`, offset: 0x1000 },
-      { path: `${GH_DL}/partitions-esp32dev.bin`, offset: 0x8000 },
-      { path: `${GH_DL}/firmware-esp32dev.bin`,   offset: 0x10000 },
+      { path: `${FW}/bootloader-esp32dev.bin`, offset: 0x1000 },
+      { path: `${FW}/partitions-esp32dev.bin`, offset: 0x8000 },
+      { path: `${FW}/firmware-esp32dev.bin`,   offset: 0x10000 },
     ],
   },
   esp32c3supermini: {
     chipFamily: 'ESP32-C3',
     parts: [
-      { path: `${GH_DL}/bootloader-esp32c3supermini.bin`, offset: 0x0 },
-      { path: `${GH_DL}/partitions-esp32c3supermini.bin`, offset: 0x8000 },
-      { path: `${GH_DL}/firmware-esp32c3supermini.bin`,   offset: 0x10000 },
+      { path: `${FW}/bootloader-esp32c3supermini.bin`, offset: 0x0 },
+      { path: `${FW}/partitions-esp32c3supermini.bin`, offset: 0x8000 },
+      { path: `${FW}/firmware-esp32c3supermini.bin`,   offset: 0x10000 },
     ],
   },
 };

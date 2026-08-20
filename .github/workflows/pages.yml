@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -26,6 +28,17 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/configure-pages@v5
+
+      - name: Download latest firmware release
+        run: |
+          mkdir -p web/firmware
+          gh release download \
+            --repo ${{ github.repository }} \
+            --pattern "*.bin" \
+            --dir web/firmware \
+            2>/dev/null || echo "No release assets yet, skipping firmware download"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - uses: actions/upload-pages-artifact@v3
         with:
