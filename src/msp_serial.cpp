@@ -206,6 +206,80 @@ void MSPSerial::sendRecordingMsg(const CameraData &data) {
     sendCustomText(MSP_TEXT_CUSTOM_2, text);
 }
 
+void MSPSerial::sendSettingsMsg(const CameraData &data) {
+    char text[17];
+
+    if (!data.valid) {
+        sendCustomText(MSP_TEXT_CUSTOM_3, "CAM:---");
+        return;
+    }
+
+    // Camera mode (DJI_MODE_* constants, shared by both drivers)
+    const char *mode;
+    switch (data.camera_mode) {
+        case 0x00: mode = "SLO"; break;
+        case 0x01: mode = "VID"; break;
+        case 0x02: mode = "TL";  break;
+        case 0x05: mode = "PHO"; break;
+        case 0x0A: mode = "HYP"; break;
+        default:   mode = "---"; break;
+    }
+
+    // Resolution from normalized CAM_RES_* code
+    static const char * const res_labels[] = {
+        "480p",  // CAM_RES_480P    0
+        "720p",  // CAM_RES_720P    1
+        "1080",  // CAM_RES_1080P   2
+        "1440",  // CAM_RES_1440P   3
+        "2.7K",  // CAM_RES_2_7K    4
+        "4K",    // CAM_RES_4K      5
+        "4KW",   // CAM_RES_4K_WIDE 6
+        "5.1K",  // CAM_RES_5_1K    7
+        "5.3K",  // CAM_RES_5_3K    8
+        "8K",    // CAM_RES_8K      9
+    };
+    const char *res = (data.resolution < sizeof(res_labels) / sizeof(res_labels[0]))
+                    ? res_labels[data.resolution] : "---";
+
+    // FPS from normalized CAM_FPS_* code
+    static const char * const fps_labels[] = {
+        "24",   // CAM_FPS_24   0
+        "25",   // CAM_FPS_25   1
+        "30",   // CAM_FPS_30   2
+        "48",   // CAM_FPS_48   3
+        "50",   // CAM_FPS_50   4
+        "60",   // CAM_FPS_60   5
+        "90",   // CAM_FPS_90   6
+        "100",  // CAM_FPS_100  7
+        "120",  // CAM_FPS_120  8
+        "200",  // CAM_FPS_200  9
+        "240",  // CAM_FPS_240  10
+        "400",  // CAM_FPS_400  11
+    };
+    const char *fps = (data.fps_idx < sizeof(fps_labels) / sizeof(fps_labels[0]))
+                    ? fps_labels[data.fps_idx] : "--";
+
+    // EIS/stabilization from normalized CAM_EIS_* code
+    static const char * const eis_labels[] = {
+        "OFF",  // CAM_EIS_OFF   0  DJI off / GoPro OFF
+        "RS",   // CAM_EIS_RS    1  DJI RockSteady
+        "HS",   // CAM_EIS_HS    2  DJI HorizonSteady
+        "RS+",  // CAM_EIS_RS+   3  DJI RockSteady+
+        "HB",   // CAM_EIS_HB    4  DJI HorizonBalance
+        "LOW",  // CAM_EIS_LOW   5  GoPro LOW
+        "HI",   // CAM_EIS_HIGH  6  GoPro HIGH
+        "BST",  // CAM_EIS_BOOST 7  GoPro BOOST
+        "ABS",  // CAM_EIS_AUTO  8  GoPro AUTO_BOOST
+        "STD",  // CAM_EIS_STD   9  GoPro STANDARD
+    };
+    const char *eis = (data.eis_mode < sizeof(eis_labels) / sizeof(eis_labels[0]))
+                    ? eis_labels[data.eis_mode] : "---";
+
+    // Format: "VID 4K/60 RS+"  max 16 chars: "SLO 5.3K/240 ABS" = 16
+    snprintf(text, sizeof(text), "%-3s %s/%s %s", mode, res, fps, eis);
+    sendCustomText(MSP_TEXT_CUSTOM_3, text);
+}
+
 void MSPSerial::sendCameraStatus(const CameraData &data) {
     MSP2CameraPayload p{};
     p.percent       = data.percent;

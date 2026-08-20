@@ -105,6 +105,7 @@ void loop() {
         mspSerial.sendCameraStatus(currentCamera);
         mspSerial.sendBatteryMsg(currentCamera);
         mspSerial.sendRecordingMsg(currentCamera);
+        mspSerial.sendSettingsMsg(currentCamera);
         lastBattMs = now;
 
         DBG_SERIAL.printf("[cam] bat=%u%%  mode=0x%02X  rec=%s  eis=%u  "

@@ -430,15 +430,50 @@ void BLECamera::handleCameraStatus(const uint8_t *payload, uint16_t len) {
     if (len < sizeof(DJICameraStatus)) return;
     const auto *s = reinterpret_cast<const DJICameraStatus *>(payload);
 
-    _camera.percent      = s->bat_percent;
-    _camera.recording    = (s->camera_status == 0x03);
-    _camera.camera_mode  = s->camera_mode;
-    _camera.eis_mode     = s->eis_mode;
-    _camera.temp_over    = s->temp_over;
-    _camera.record_time  = s->record_time;
+    _camera.percent       = s->bat_percent;
+    _camera.recording     = (s->camera_status == 0x03);
+    _camera.camera_mode   = s->camera_mode;
+    _camera.temp_over     = s->temp_over;
+    _camera.record_time   = s->record_time;
     _camera.remain_cap_mb = s->remain_capacity;
-    _camera.remain_time  = s->remain_time;
-    _camera.valid        = true;
+    _camera.remain_time   = s->remain_time;
+
+    // DJI eis_mode byte (0-4) maps directly to CAM_EIS_OFF..CAM_EIS_HB.
+    _camera.eis_mode = s->eis_mode;  // 0=off, 1=RS, 2=HS, 3=RS+, 4=HB
+
+    // Map DJI video_resolution index to common CAM_RES_* codes.
+    // Indices are ordered by increasing resolution on DJI Action cameras.
+    static const uint8_t dji_res_map[] = {
+        CAM_RES_480P,    // 0
+        CAM_RES_720P,    // 1
+        CAM_RES_1080P,   // 2
+        CAM_RES_2_7K,    // 3
+        CAM_RES_4K,      // 4
+        CAM_RES_4K_WIDE, // 5  (4:3 / SuperView)
+        CAM_RES_5_1K,    // 6
+        CAM_RES_5_3K,    // 7
+    };
+    _camera.resolution = (s->video_resolution < sizeof(dji_res_map))
+                       ? dji_res_map[s->video_resolution] : CAM_RES_UNKNOWN;
+
+    // Map DJI fps_idx to common CAM_FPS_* codes.
+    // Order mirrors DJI Action camera FPS options (ascending index = ascending fps).
+    static const uint8_t dji_fps_map[] = {
+        CAM_FPS_24,   // 0
+        CAM_FPS_25,   // 1
+        CAM_FPS_30,   // 2
+        CAM_FPS_48,   // 3
+        CAM_FPS_50,   // 4
+        CAM_FPS_60,   // 5
+        CAM_FPS_100,  // 6
+        CAM_FPS_120,  // 7
+        CAM_FPS_200,  // 8
+        CAM_FPS_240,  // 9
+    };
+    _camera.fps_idx = (s->fps_idx < sizeof(dji_fps_map))
+                    ? dji_fps_map[s->fps_idx] : CAM_FPS_UNKNOWN;
+
+    _camera.valid = true;
 
     if (_cameraCb) _cameraCb(_camera);
 

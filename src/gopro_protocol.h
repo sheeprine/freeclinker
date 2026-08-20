@@ -44,6 +44,14 @@
 #define GP_STATUS_BATTERY_PCT    70   // uint8: 0-100 %
 #define GP_STATUS_PRESET_GROUP   96   // uint8: 0=video, 1=photo, 2=timelapse
 
+// ─── Setting IDs (queried via GP-0076, same channel as statuses) ──────────────
+// These are registered with 0x52 alongside status IDs; no numeric overlap with
+// the status IDs above, so they can be demultiplexed by ID in the TLV parser.
+
+#define GP_SETTING_RESOLUTION    2    // uint8: VIDEO_RESOLUTION value (see below)
+#define GP_SETTING_FPS           3    // uint8: FRAMES_PER_SECOND value (see below)
+#define GP_SETTING_HYPERSMOOTH   135  // uint8: 0=OFF,1=LOW,2=HIGH,3=BOOST,4=AUTO_BOOST,100=STD
+
 // ─── Packet framing helpers ───────────────────────────────────────────────────
 //
 // Outbound (ESP32 → GoPro):

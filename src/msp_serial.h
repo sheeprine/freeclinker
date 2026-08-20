@@ -14,6 +14,7 @@
 // Text type values for MSP2_SET_TEXT / MSP2_GET_TEXT
 #define MSP_TEXT_CUSTOM_1           7   // "Custom Message 1" OSD field
 #define MSP_TEXT_CUSTOM_2           8   // "Custom Message 2" OSD field
+#define MSP_TEXT_CUSTOM_3           9   // "Custom Message 3" OSD field
 
 // Custom vendor command — carries DJI Action camera telemetry.
 // Receivers that don't recognise 0x3001 silently ignore the frame.
@@ -61,6 +62,10 @@ public:
     // Push recording state/timer or temperature warning as Custom Message 2.
     // "REC MM:SS" while recording, "CAM:HOT" on temp warning, else "IDLE".
     void sendRecordingMsg(const CameraData &data);
+
+    // Push camera settings (mode, resolution, FPS, EIS) as Custom Message 3.
+    // Format: "VID 4K/60 RS+"  Resolution/FPS show "---/--" when not reported.
+    void sendSettingsMsg(const CameraData &data);
 
     bool isArmed() const { return _armed; }
     void setArmCallback(ArmCallback cb) { _armCb = cb; }

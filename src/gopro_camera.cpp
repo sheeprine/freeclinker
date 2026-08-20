@@ -232,8 +232,11 @@ void GoProCamera::sendHardwareInfoQuery() {
 
 void GoProCamera::sendRegisterQuery() {
     if (!_queryChar) return;
-    // Register for change notifications on all tracked status IDs.
+    // Register for change notifications on status IDs and setting IDs.
+    // Both share the same 0x52 registration command on GP-0076.
+    // Setting IDs 2, 3, 135 do not collide with any of the status IDs below.
     const uint8_t ids[] = {
+        // Status IDs
         GP_STATUS_OVERHEATING,
         GP_STATUS_ENCODING,
         GP_STATUS_ENC_DURATION,
@@ -241,15 +244,18 @@ void GoProCamera::sendRegisterQuery() {
         GP_STATUS_SD_REMAINING,
         GP_STATUS_BATTERY_PCT,
         GP_STATUS_PRESET_GROUP,
+        // Setting IDs
+        GP_SETTING_RESOLUTION,
+        GP_SETTING_FPS,
+        GP_SETTING_HYPERSMOOTH,
     };
-    // Payload: [query_id, id_0, id_1, ...]
     uint8_t payload_len = 1 + (uint8_t)sizeof(ids);
     uint8_t buf[32];
-    buf[0] = payload_len & 0x1F;         // header
-    buf[1] = GP_QUERY_REGISTER_STATUS;   // 0x52
+    buf[0] = payload_len & 0x1F;
+    buf[1] = GP_QUERY_REGISTER_STATUS;
     memcpy(buf + 2, ids, sizeof(ids));
     _queryChar->writeValue(buf, 1 + payload_len, false);
-    DBG_SERIAL.println("[GP] Register for status updates sent");
+    DBG_SERIAL.println("[GP] Register for status + setting updates sent");
 }
 
 // ─── Recording & mode commands ────────────────────────────────────────────────
@@ -362,7 +368,9 @@ void GoProCamera::handleQueryMessage(const uint8_t *msg, size_t len) {
     }
 }
 
-// Parse TLV status triplets: [id(1), len(1), value(len)...]
+// Parse TLV triplets: [id(1), len(1), value(len)...]
+// Handles both status IDs and setting IDs — they share the same query channel
+// and do not collide with any of the IDs we register for.
 void GoProCamera::parseStatusTlv(const uint8_t *tlv, size_t len) {
     size_t pos = 0;
     bool   updated = false;
@@ -376,54 +384,118 @@ void GoProCamera::parseStatusTlv(const uint8_t *tlv, size_t len) {
         pos += vlen;
 
         switch (id) {
-            case GP_STATUS_BATTERY_PCT:
-                if (vlen >= 1) { _camera.percent = v[0]; updated = true; }
-                break;
 
-            case GP_STATUS_ENCODING:
-                if (vlen >= 1) { _camera.recording = (v[0] != 0); updated = true; }
-                break;
+        // ── Status IDs ───────────────────────────────────────────────────────
+        case GP_STATUS_BATTERY_PCT:
+            if (vlen >= 1) { _camera.percent = v[0]; updated = true; }
+            break;
 
-            case GP_STATUS_ENC_DURATION:
-                if (vlen >= 4) {
-                    uint32_t secs = ((uint32_t)v[0] << 24) | ((uint32_t)v[1] << 16) |
-                                    ((uint32_t)v[2] <<  8) |  (uint32_t)v[3];
-                    _camera.record_time = (uint16_t)(secs & 0xFFFF);
-                    updated = true;
+        case GP_STATUS_ENCODING:
+            if (vlen >= 1) { _camera.recording = (v[0] != 0); updated = true; }
+            break;
+
+        case GP_STATUS_ENC_DURATION:
+            if (vlen >= 4) {
+                uint32_t secs = ((uint32_t)v[0] << 24) | ((uint32_t)v[1] << 16) |
+                                ((uint32_t)v[2] <<  8) |  (uint32_t)v[3];
+                _camera.record_time = (uint16_t)(secs & 0xFFFF);
+                updated = true;
+            }
+            break;
+
+        case GP_STATUS_REMAINING_TIME:
+            if (vlen >= 4) {
+                _camera.remain_time = ((uint32_t)v[0] << 24) | ((uint32_t)v[1] << 16) |
+                                      ((uint32_t)v[2] <<  8) |  (uint32_t)v[3];
+                updated = true;
+            }
+            break;
+
+        case GP_STATUS_SD_REMAINING:
+            if (vlen >= 4) {
+                _camera.remain_cap_mb = ((uint32_t)v[0] << 24) | ((uint32_t)v[1] << 16) |
+                                        ((uint32_t)v[2] <<  8) |  (uint32_t)v[3];
+                updated = true;
+            }
+            break;
+
+        case GP_STATUS_OVERHEATING:
+            if (vlen >= 1) { _camera.temp_over = v[0] ? 1 : 0; updated = true; }
+            break;
+
+        case GP_STATUS_PRESET_GROUP:
+            if (vlen >= 1) {
+                switch (v[0]) {
+                    case 1:  _camera.camera_mode = DJI_MODE_PHOTO;     break;
+                    case 2:  _camera.camera_mode = DJI_MODE_TIMELAPSE; break;
+                    default: _camera.camera_mode = DJI_MODE_VIDEO;     break;
                 }
-                break;
+                updated = true;
+            }
+            break;
 
-            case GP_STATUS_REMAINING_TIME:
-                if (vlen >= 4) {
-                    _camera.remain_time = ((uint32_t)v[0] << 24) | ((uint32_t)v[1] << 16) |
-                                          ((uint32_t)v[2] <<  8) |  (uint32_t)v[3];
-                    updated = true;
+        // ── Setting IDs ──────────────────────────────────────────────────────
+        // GP_SETTING_RESOLUTION (2): map to CAM_RES_* constants
+        case GP_SETTING_RESOLUTION:
+            if (vlen >= 1) {
+                uint8_t r;
+                switch (v[0]) {
+                    case 1:   r = CAM_RES_4K;      break;  // 4K 16:9
+                    case 2:   r = CAM_RES_4K_WIDE;  break;  // 4K SuperView / 4:3
+                    case 4:   r = CAM_RES_2_7K;    break;
+                    case 9:   r = CAM_RES_1080P;   break;
+                    case 12:  r = CAM_RES_720P;    break;
+                    case 31:  r = CAM_RES_8K;      break;
+                    case 100: r = CAM_RES_5_3K;    break;
+                    default:  r = CAM_RES_UNKNOWN; break;
                 }
-                break;
+                _camera.resolution = r;
+                updated = true;
+                DBG_SERIAL.printf("[GP] Resolution: raw=%u → 0x%02X\n", v[0], r);
+            }
+            break;
 
-            case GP_STATUS_SD_REMAINING:
-                if (vlen >= 4) {
-                    _camera.remain_cap_mb = ((uint32_t)v[0] << 24) | ((uint32_t)v[1] << 16) |
-                                            ((uint32_t)v[2] <<  8) |  (uint32_t)v[3];
-                    updated = true;
+        // GP_SETTING_FPS (3): map to CAM_FPS_* constants
+        case GP_SETTING_FPS:
+            if (vlen >= 1) {
+                uint8_t f;
+                switch (v[0]) {
+                    case 0:  f = CAM_FPS_240;     break;
+                    case 1:  f = CAM_FPS_120;     break;
+                    case 2:  f = CAM_FPS_100;     break;
+                    case 5:  f = CAM_FPS_60;      break;
+                    case 6:  f = CAM_FPS_50;      break;
+                    case 8:  f = CAM_FPS_30;      break;
+                    case 9:  f = CAM_FPS_25;      break;
+                    case 10: f = CAM_FPS_24;      break;
+                    case 13: f = CAM_FPS_200;     break;
+                    case 15: f = CAM_FPS_400;     break;
+                    default: f = CAM_FPS_UNKNOWN; break;
                 }
-                break;
+                _camera.fps_idx = f;
+                updated = true;
+                DBG_SERIAL.printf("[GP] FPS: raw=%u → 0x%02X\n", v[0], f);
+            }
+            break;
 
-            case GP_STATUS_OVERHEATING:
-                if (vlen >= 1) { _camera.temp_over = v[0] ? 1 : 0; updated = true; }
-                break;
-
-            case GP_STATUS_PRESET_GROUP:
-                if (vlen >= 1) {
-                    // Map GoPro preset group → DJI-style camera_mode for telemetry
-                    switch (v[0]) {
-                        case 1:  _camera.camera_mode = DJI_MODE_PHOTO;     break;
-                        case 2:  _camera.camera_mode = DJI_MODE_TIMELAPSE; break;
-                        default: _camera.camera_mode = DJI_MODE_VIDEO;     break;
-                    }
-                    updated = true;
+        // GP_SETTING_HYPERSMOOTH (135): map to CAM_EIS_* constants
+        case GP_SETTING_HYPERSMOOTH:
+            if (vlen >= 1) {
+                uint8_t e;
+                switch (v[0]) {
+                    case 0:   e = CAM_EIS_OFF;     break;
+                    case 1:   e = CAM_EIS_LOW;     break;
+                    case 2:   e = CAM_EIS_HIGH;    break;
+                    case 3:   e = CAM_EIS_BOOST;   break;
+                    case 4:   e = CAM_EIS_AUTO;    break;
+                    case 100: e = CAM_EIS_STD;     break;
+                    default:  e = CAM_EIS_UNKNOWN; break;
                 }
-                break;
+                _camera.eis_mode = e;
+                updated = true;
+                DBG_SERIAL.printf("[GP] HyperSmooth: raw=%u → 0x%02X\n", v[0], e);
+            }
+            break;
         }
     }
 
