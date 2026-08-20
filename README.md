@@ -78,7 +78,20 @@ Type `help` in the serial console to list all commands, `show` to print current 
 
 ## Web interface
 
-**→ [sheeprine.github.io/freeclinker](https://sheeprine.github.io/freeclinker/)** — hosted config UI (Chrome / Edge)
+There are two ways to reach the configuration UI:
+
+**Built-in WiFi AP (any browser, no cable)**
+
+If no camera connects within 30 seconds of boot, the ESP32 automatically starts a WiFi access point:
+
+- SSID: `FreeCLinker` (open, no password)
+- URL: `http://192.168.4.1`
+
+Connect your phone or laptop to the `FreeCLinker` network and open that URL. The AP shuts down as soon as a camera connects and restarts 30 s after a camera disconnects.
+
+**USB Serial (Chrome / Edge desktop)**
+
+**→ [sheeprine.github.io/freeclinker](https://sheeprine.github.io/freeclinker/)** — hosted config UI
 
 Or open `web/index.html` locally (no server required). Connect to the ESP32 via the browser's Web Serial dialog to get a graphical config panel and an interactive CLI terminal.
 

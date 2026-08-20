@@ -178,11 +178,26 @@ The change is persisted across reboots. A reboot is required for `camera_type` t
 
 ## 5. Web interface
 
-The configuration UI uses the **Web Serial API** and works in **Chrome** or **Edge** (desktop). Firefox does not support Web Serial.
+There are two ways to open the configuration UI — choose whichever is more convenient.
 
-### Open it
+### Option A — Built-in WiFi AP (easiest, any browser, no cable)
 
-**Hosted:** open **[sheeprine.github.io/freeclinker](https://sheeprine.github.io/freeclinker/)** directly in Chrome or Edge.
+If no camera connects within **30 seconds** of boot, the ESP32 automatically starts a WiFi access point:
+
+| Setting  | Value            |
+|----------|------------------|
+| SSID     | `FreeCLinker`    |
+| Password | *(none — open)*  |
+| URL      | `http://192.168.4.1` |
+
+1. On your phone or laptop, join the `FreeCLinker` WiFi network.
+2. Open `http://192.168.4.1` in any browser.
+
+The AP stops as soon as a camera connects (BLE pairing takes priority). It restarts automatically 30 s after a camera disconnects, so you can always reconfigure between flights without a USB cable.
+
+### Option B — USB Serial (Chrome / Edge desktop only)
+
+**Hosted:** open **[sheeprine.github.io/freeclinker](https://sheeprine.github.io/freeclinker/)** in Chrome or Edge.
 
 **Local:** open `web/index.html` from the cloned repo:
 
