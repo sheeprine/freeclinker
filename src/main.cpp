@@ -86,7 +86,7 @@ void setup() {
                             : static_cast<Camera *>(&djiCamera);
 
     DBG_SERIAL.printf("[main] Camera type: %s\n", useGoPro ? "GoPro" : "DJI Action");
-    DBG_SERIAL.printf("[main] MSP output: UART2 TX=GPIO%d @ %u baud\n",
+    DBG_SERIAL.printf("[main] MSP output: TX=GPIO%d @ %u baud\n",
                       BF_TX_PIN, BF_BAUD);
     DBG_SERIAL.printf("[main] WiFi AP '%s' starts in %u s if no camera connects\n",
                       WIFI_AP_SSID, WIFI_AP_START_DELAY_MS / 1000);

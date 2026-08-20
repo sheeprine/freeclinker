@@ -20,16 +20,25 @@
 
 // ─── Betaflight serial (MSP port) ────────────────────────────────────────────
 //
-// Wire ESP32 TX17 → FC UART RX.  Only TX is needed.
-//
 // Betaflight CLI setup (replace N with the actual UART number):
 //   serial N 0 115200 8 0 0 0   # set UART N to MSP
 //   save
 //
-#define BF_SERIAL                   Serial2
 #define BF_BAUD                     115200
+
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+// ESP32-C3 has only UART0 + UART1; Serial2 does not exist.
+// Wire GPIO4 (TX) → FC UART RX.
+#define BF_SERIAL                   Serial1
+#define BF_TX_PIN                   4
+#define BF_RX_PIN                   5
+#else
+// ESP32: use UART2 so UART0 (USB) stays free for the debug console.
+// Wire GPIO17 (TX) → FC UART RX.
+#define BF_SERIAL                   Serial2
 #define BF_TX_PIN                   17
 #define BF_RX_PIN                   16   // used to receive MSP responses from FC
+#endif
 
 // ─── Debug serial (USB) ──────────────────────────────────────────────────────
 #define DBG_SERIAL                  Serial
