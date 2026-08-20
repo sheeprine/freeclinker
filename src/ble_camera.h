@@ -8,10 +8,8 @@
 #include <BLEAdvertisedDevice.h>
 #include <esp_gap_ble_api.h>
 #include <esp_mac.h>            // esp_read_mac()
+#include "camera.h"
 #include "dji_protocol.h"
-#include "telemetry.h"
-
-using CameraCallback = void (*)(const CameraData &);
 
 // BLE client for DJI Action cameras.
 //
@@ -25,19 +23,18 @@ using CameraCallback = void (*)(const CameraData &);
 // 6. ESP32 → camera: ACK to camera hello (same seq as step 5)
 // 7. ESP32 → camera: status subscription (CmdSet 0x1D / CmdID 0x05, 2 Hz)
 // 8. Camera → ESP32: 2 Hz status push  (CmdSet 0x1D / CmdID 0x02) — battery % + mode
-class BLECamera : public BLEAdvertisedDeviceCallbacks,
+class BLECamera : public Camera,
+                  public BLEAdvertisedDeviceCallbacks,
                   public BLEClientCallbacks {
 public:
-    void begin();
-    void update();   // call from loop()
+    void begin() override;
+    void update() override;
 
-    void setCameraCallback(CameraCallback cb) { _cameraCb = cb; }
+    bool isConnected() const override { return _djiConnected; }
 
-    bool isConnected() const { return _djiConnected; }
-
-    bool startRecording();
-    bool stopRecording();
-    bool switchCameraMode(uint8_t mode);  // DJI_MODE_* constants
+    bool startRecording() override;
+    bool stopRecording() override;
+    bool switchCameraMode(uint8_t mode) override;  // DJI_MODE_* constants
 
 private:
     // BLE stack callbacks
@@ -94,7 +91,6 @@ private:
     uint16_t                  _pendingAckSeq     = 0;
 
     uint32_t        _deviceId  = 0;      // device_id used in connect request
-    CameraCallback  _cameraCb  = nullptr;
     CameraData      _camera{};
 
     static BLECamera *_instance;
