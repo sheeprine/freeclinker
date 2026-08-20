@@ -310,6 +310,56 @@
         <button id="applyBtn" class="primary" disabled>Apply</button>
       </div>
     </div>
+
+    <!-- Camera Mode Switch card -->
+    <div class="config-card" style="margin-top: 16px;">
+      <div class="card-header">
+        <h2>Camera Mode Switch</h2>
+      </div>
+
+      <!-- AUX Channel -->
+      <div class="cfg-field">
+        <div class="cfg-field-text">
+          <div class="cfg-field-name">AUX Channel</div>
+          <div class="cfg-field-desc">RC channel monitored for camera mode switching. Set to Disabled if not used.</div>
+        </div>
+        <select id="auxChannel" disabled>
+          <option value="0">Disabled</option>
+          <option value="1">AUX 1</option>
+          <option value="2">AUX 2</option>
+          <option value="3">AUX 3</option>
+          <option value="4">AUX 4</option>
+          <option value="5">AUX 5</option>
+          <option value="6">AUX 6</option>
+          <option value="7">AUX 7</option>
+          <option value="8">AUX 8</option>
+          <option value="9">AUX 9</option>
+          <option value="10">AUX 10</option>
+          <option value="11">AUX 11</option>
+          <option value="12">AUX 12</option>
+        </select>
+      </div>
+
+      <!-- AUX Mode -->
+      <div class="cfg-field">
+        <div class="cfg-field-text">
+          <div class="cfg-field-name">Mode when high (&gt; 1500 µs)</div>
+          <div class="cfg-field-desc">Camera mode to activate when the AUX channel goes high. Returns to Video when low.</div>
+        </div>
+        <select id="auxMode" disabled>
+          <option value="0">Slow Motion</option>
+          <option value="1">Video</option>
+          <option value="2">Timelapse</option>
+          <option value="5">Photo</option>
+          <option value="10" selected>Hyperlapse</option>
+        </select>
+      </div>
+
+      <div class="card-footer">
+        <span class="saved-msg" id="auxSavedMsg"></span>
+        <button id="auxApplyBtn" class="primary" disabled>Apply</button>
+      </div>
+    </div>
   </div>
 
   <!-- CLI -->
@@ -343,12 +393,16 @@ const sendBtn       = document.getElementById('sendBtn');
 const statusText    = document.getElementById('statusText');
 const dot           = document.getElementById('dot');
 const baudSelect    = document.getElementById('baudRate');
-const readBtn       = document.getElementById('readBtn');
-const applyBtn      = document.getElementById('applyBtn');
-const stopToggle    = document.getElementById('stopOnDisarm');
-const delayInput    = document.getElementById('disarmDelay');
-const delayEquiv    = document.getElementById('delayEquiv');
-const savedMsg      = document.getElementById('savedMsg');
+const readBtn        = document.getElementById('readBtn');
+const applyBtn       = document.getElementById('applyBtn');
+const stopToggle     = document.getElementById('stopOnDisarm');
+const delayInput     = document.getElementById('disarmDelay');
+const delayEquiv     = document.getElementById('delayEquiv');
+const savedMsg       = document.getElementById('savedMsg');
+const auxChannelSel  = document.getElementById('auxChannel');
+const auxModeSel     = document.getElementById('auxMode');
+const auxApplyBtn    = document.getElementById('auxApplyBtn');
+const auxSavedMsg    = document.getElementById('auxSavedMsg');
 
 // ── Serial state ──────────────────────────────────────────────────────────────
 let port        = null;
@@ -404,6 +458,18 @@ function parseConfigLine(line) {
     updateDelayEquiv();
   } else if (key === 'stop_on_disarm') {
     stopToggle.checked = (val === 'true');
+  } else if (key === 'aux_channel') {
+    // "disabled" or "AUX5"
+    if (val === 'disabled') {
+      auxChannelSel.value = '0';
+    } else {
+      const ch = val.match(/AUX(\d+)/);
+      if (ch) auxChannelSel.value = ch[1];
+    }
+    updateAuxModeState();
+  } else if (key === 'aux_mode') {
+    // "0x0A" — parseInt auto-detects 0x prefix
+    auxModeSel.value = parseInt(val).toString();
   }
 }
 
@@ -525,13 +591,27 @@ applyBtn.addEventListener('click', async () => {
   const stop  = stopToggle.checked ? 1 : 0;
   await sendCommand(`set disarm_delay ${delay}`);
   await sendCommand(`set stop_on_disarm ${stop}`);
-  showSaved();
+  flashSaved(savedMsg);
 });
 
-function showSaved() {
-  savedMsg.textContent = 'Applied';
-  savedMsg.style.opacity = '1';
-  setTimeout(() => { savedMsg.style.opacity = '0'; }, 2500);
+auxApplyBtn.addEventListener('click', async () => {
+  const ch   = auxChannelSel.value;
+  const mode = '0x' + parseInt(auxModeSel.value).toString(16).padStart(2, '0').toUpperCase();
+  await sendCommand(`set aux_channel ${ch}`);
+  await sendCommand(`set aux_mode ${mode}`);
+  flashSaved(auxSavedMsg);
+});
+
+auxChannelSel.addEventListener('change', updateAuxModeState);
+
+function updateAuxModeState() {
+  auxModeSel.disabled = !port || parseInt(auxChannelSel.value) === 0;
+}
+
+function flashSaved(el) {
+  el.textContent = 'Applied';
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 2500);
 }
 
 delayInput.addEventListener('input', updateDelayEquiv);
@@ -555,6 +635,9 @@ function setConnected(connected) {
   applyBtn.disabled      = !connected;
   stopToggle.disabled    = !connected;
   delayInput.disabled    = !connected;
+  auxChannelSel.disabled = !connected;
+  auxApplyBtn.disabled   = !connected;
+  updateAuxModeState();
 }
 
 connectBtn.addEventListener('click', connect);
