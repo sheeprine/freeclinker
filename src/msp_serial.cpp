@@ -156,7 +156,7 @@ void MSPSerial::sendCustomText(uint8_t textType, const char *text) {
     sendFrame(MSP2_SET_TEXT, buf, 2 + textLen, '<');
 }
 
-void MSPSerial::sendBatteryAsCustomMessage(const BatteryData &data) {
+void MSPSerial::sendBatteryMsg(const CameraData &data) {
     char text[12];
     if (data.valid)
         snprintf(text, sizeof(text), "CAM:%3u%%", data.percent);
@@ -165,19 +165,30 @@ void MSPSerial::sendBatteryAsCustomMessage(const BatteryData &data) {
     sendCustomText(MSP_TEXT_CUSTOM_1, text);
 }
 
-void MSPSerial::sendRecordingAsCustomMessage(const BatteryData &data) {
-    sendCustomText(MSP_TEXT_CUSTOM_2, data.recording ? "REC" : "IDLE");
+void MSPSerial::sendRecordingMsg(const CameraData &data) {
+    char text[12];
+    if (data.temp_over >= 2) {
+        snprintf(text, sizeof(text), "CAM:HOT");
+    } else if (data.recording) {
+        uint16_t mins = data.record_time / 60;
+        uint8_t  secs = data.record_time % 60;
+        snprintf(text, sizeof(text), "REC%3u:%02u", mins, secs);
+    } else {
+        snprintf(text, sizeof(text), "IDLE");
+    }
+    sendCustomText(MSP_TEXT_CUSTOM_2, text);
 }
 
-void MSPSerial::sendCameraBattery(const BatteryData &data) {
-    MSP2CameraBatteryPayload p{};
-    p.percent     = data.percent;
-    p.voltage     = data.voltage;
-    p.current     = data.current;
-    p.remaining   = data.remaining;
-    p.capacity    = data.capacity;
-    p.temperature = data.temperature;
-    p.cellCount   = data.cellCount;
+void MSPSerial::sendCameraStatus(const CameraData &data) {
+    MSP2CameraPayload p{};
+    p.percent       = data.percent;
+    p.camera_mode   = data.camera_mode;
+    p.recording     = data.recording ? 1 : 0;
+    p.temp_over     = data.temp_over;
+    p.eis_mode      = data.eis_mode;
+    p.record_time   = data.record_time;
+    p.remain_cap_mb = data.remain_cap_mb;
+    p.remain_time   = data.remain_time;
 
     sendFrame(MSP2_CAMERA_BATTERY,
               reinterpret_cast<const uint8_t *>(&p),

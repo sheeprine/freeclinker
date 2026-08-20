@@ -8,17 +8,17 @@ static BLECamera     bleCamera;
 static MSPSerial     mspSerial;
 static ConfigManager configManager;
 
-static volatile bool hasBattery = false;
-static BatteryData   currentBattery{};
+static volatile bool hasCamera = false;
+static CameraData    currentCamera{};
 static uint32_t      lastBattMs = 0;
 
 static bool     pendingStop = false;
 static uint32_t disarmMs   = 0;
 
 // Called from the BLE stack task — copy + flag only; MSP output on main task.
-static void onBattery(const BatteryData &data) {
-    currentBattery = data;
-    hasBattery     = true;
+static void onCameraData(const CameraData &data) {
+    currentCamera = data;
+    hasCamera     = true;
 }
 
 // Called from mspSerial.update() whenever the FC arm state changes.
@@ -59,7 +59,7 @@ void setup() {
     mspSerial.begin(BF_SERIAL);
     mspSerial.setArmCallback(onArmStateChange);
 
-    bleCamera.setBatteryCallback(onBattery);
+    bleCamera.setCameraCallback(onCameraData);
     bleCamera.begin();
 }
 
@@ -77,27 +77,26 @@ void loop() {
         bleCamera.stopRecording();
     }
 
-    // ── Battery ────────────────────────────────────────────────────────────
+    // ── Camera telemetry ───────────────────────────────────────────────────
     const bool battKeepalive =
         bleCamera.isConnected() &&
         MSP_BATTERY_KEEPALIVE_MS > 0 &&
         (now - lastBattMs) >= MSP_BATTERY_KEEPALIVE_MS;
 
-    if (hasBattery || battKeepalive) {
-        hasBattery = false;
-        mspSerial.sendCameraBattery(currentBattery);
-        mspSerial.sendBatteryAsCustomMessage(currentBattery);
-        mspSerial.sendRecordingAsCustomMessage(currentBattery);
+    if (hasCamera || battKeepalive) {
+        hasCamera  = false;
+        mspSerial.sendCameraStatus(currentCamera);
+        mspSerial.sendBatteryMsg(currentCamera);
+        mspSerial.sendRecordingMsg(currentCamera);
         lastBattMs = now;
 
-        DBG_SERIAL.printf("[batt] %u%%  %umV  %dmA  %u/%umAh  %d°C  %ucell\n",
-                          currentBattery.percent,
-                          currentBattery.voltage,
-                          currentBattery.current,
-                          currentBattery.remaining,
-                          currentBattery.capacity,
-                          currentBattery.temperature,
-                          currentBattery.cellCount);
+        DBG_SERIAL.printf("[cam] bat=%u%%  mode=0x%02X  rec=%s  eis=%u  "
+                          "time=%us  sd=%uMB  remain=%us  temp=%u\n",
+                          currentCamera.percent, currentCamera.camera_mode,
+                          currentCamera.recording ? "yes" : "no",
+                          currentCamera.eis_mode, currentCamera.record_time,
+                          currentCamera.remain_cap_mb, currentCamera.remain_time,
+                          currentCamera.temp_over);
     }
 
     delay(10);

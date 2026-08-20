@@ -14,7 +14,7 @@
 #define MSP_TEXT_CUSTOM_1           7   // "Custom Message 1" OSD field
 #define MSP_TEXT_CUSTOM_2           8   // "Custom Message 2" OSD field
 
-// Custom vendor command — carries DJI Action camera battery state.
+// Custom vendor command — carries DJI Action camera telemetry.
 // Receivers that don't recognise 0x3001 silently ignore the frame.
 #define MSP2_CAMERA_BATTERY         0x3001
 
@@ -22,16 +22,18 @@
 // Packed so memcpy onto the wire is safe regardless of compiler padding.
 
 // MSP2_CAMERA_BATTERY (0x3001) payload — custom vendor message.
-struct __attribute__((packed)) MSP2CameraBatteryPayload {
-    uint8_t  percent;      // 0–100 %
-    uint16_t voltage;      // mV
-    int16_t  current;      // mA  (positive = discharging)
-    uint16_t remaining;    // mAh remaining
-    uint16_t capacity;     // mAh total
-    int8_t   temperature;  // °C  (INT8_MIN = unknown)
-    uint8_t  cellCount;    // 0 = unknown
+// Fields reflect what the DJI BLE status push actually provides.
+struct __attribute__((packed)) MSP2CameraPayload {
+    uint8_t  percent;        // battery 0–100 %
+    uint8_t  camera_mode;    // 0x01=video, 0x05=photo, 0x0A=hyperlapse, …
+    uint8_t  recording;      // 0=idle, 1=recording
+    uint8_t  temp_over;      // 0=ok, 1=warn, 2=hot(can't record), 3=shutdown
+    uint8_t  eis_mode;       // 0=off, 1=RS, 2=HS, 3=RS+, 4=HB
+    uint16_t record_time;    // seconds currently recording
+    uint32_t remain_cap_mb;  // SD card remaining (MB)
+    uint32_t remain_time;    // recording seconds remaining
 };
-static_assert(sizeof(MSP2CameraBatteryPayload) == 11, "Battery payload size mismatch");
+static_assert(sizeof(MSP2CameraPayload) == 15, "Camera payload size mismatch");
 
 // Arm-state change notification — called on the main task (from update()).
 using ArmCallback = void (*)(bool armed);
@@ -45,14 +47,15 @@ public:
     // Call from loop() — polls FC for arm state and drains RX bytes.
     void update();
 
-    // Build and send MSP2_CAMERA_BATTERY (0x3001) from a BatteryData snapshot.
-    void sendCameraBattery(const BatteryData &data);
+    // Build and send MSP2_CAMERA_BATTERY (0x3001) from a CameraData snapshot.
+    void sendCameraStatus(const CameraData &data);
 
     // Format battery % as "CAM:NNN%" and push as Betaflight Custom Message 1.
-    void sendBatteryAsCustomMessage(const BatteryData &data);
+    void sendBatteryMsg(const CameraData &data);
 
-    // Push "REC" or "IDLE" as Betaflight Custom Message 2.
-    void sendRecordingAsCustomMessage(const BatteryData &data);
+    // Push recording state/timer or temperature warning as Custom Message 2.
+    // "REC MM:SS" while recording, "CAM:HOT" on temp warning, else "IDLE".
+    void sendRecordingMsg(const CameraData &data);
 
     bool isArmed() const { return _armed; }
     void setArmCallback(ArmCallback cb) { _armCb = cb; }

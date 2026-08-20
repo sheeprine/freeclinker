@@ -38,9 +38,10 @@
 #define DJI_CMD_CONNECT     0x19        // ESP32 ↔ camera: connection handshake
 
 // Camera command IDs (CmdSet 0x1D)
-#define DJI_CMD_STATUS_PUSH 0x02        // camera → ESP32: battery + mode
-#define DJI_CMD_RECORD_CTRL 0x03
-#define DJI_CMD_STATUS_SUB  0x05        // ESP32 → camera: subscribe to status push
+#define DJI_CMD_STATUS_PUSH     0x02    // camera → ESP32: battery + mode (all cameras)
+#define DJI_CMD_RECORD_CTRL     0x03
+#define DJI_CMD_STATUS_SUB      0x05    // ESP32 → camera: subscribe to status push
+#define DJI_CMD_NEW_STATUS_PUSH 0x06    // camera → ESP32: mode name strings (newer cameras)
 
 // Record control actions (CmdSet 0x1D, CmdID 0x03)
 #define DJI_RECORD_START            0x00

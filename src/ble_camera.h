@@ -11,7 +11,7 @@
 #include "dji_protocol.h"
 #include "telemetry.h"
 
-using BatteryCallback = void (*)(const BatteryData &);
+using CameraCallback = void (*)(const CameraData &);
 
 // BLE client for DJI Action cameras.
 //
@@ -31,7 +31,7 @@ public:
     void begin();
     void update();   // call from loop()
 
-    void setBatteryCallback(BatteryCallback cb) { _batteryCb = cb; }
+    void setCameraCallback(CameraCallback cb) { _cameraCb = cb; }
 
     bool isConnected() const { return _djiConnected; }
 
@@ -63,6 +63,7 @@ private:
     void handleConnectResponse(const uint8_t *payload, uint16_t len);
     void handleConnectCommand(uint16_t camSeq, const uint8_t *payload, uint16_t len);
     void handleCameraStatus(const uint8_t *payload, uint16_t len);
+    void handleNewCameraStatus(const uint8_t *payload, uint16_t len);
     void handleRecordAck(const uint8_t *payload, uint16_t len);
 
     // ── Debug ─────────────────────────────────────────────────────────────
@@ -90,9 +91,9 @@ private:
     bool                      _pendingConnectAck = false;
     uint16_t                  _pendingAckSeq     = 0;
 
-    uint32_t         _deviceId   = 0;      // device_id used in connect request
-    BatteryCallback  _batteryCb  = nullptr;
-    BatteryData      _battery{};
+    uint32_t        _deviceId  = 0;      // device_id used in connect request
+    CameraCallback  _cameraCb  = nullptr;
+    CameraData      _camera{};
 
     static BLECamera *_instance;
 };

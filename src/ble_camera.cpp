@@ -353,6 +353,8 @@ void BLECamera::dispatchFrame(uint8_t cmd_type, uint8_t cmd_set, uint8_t cmd_id,
             handleConnectCommand(seq, payload, payload_len);
     } else if (cmd_set == DJI_CMDSET_CAMERA && cmd_id == DJI_CMD_STATUS_PUSH) {
         handleCameraStatus(payload, payload_len);
+    } else if (cmd_set == DJI_CMDSET_CAMERA && cmd_id == DJI_CMD_NEW_STATUS_PUSH) {
+        handleNewCameraStatus(payload, payload_len);
     } else if (cmd_set == DJI_CMDSET_CAMERA && cmd_id == DJI_CMD_RECORD_CTRL
                && DJI_IS_ACK(cmd_type)) {
         handleRecordAck(payload, payload_len);
@@ -404,23 +406,42 @@ void BLECamera::handleRecordAck(const uint8_t *payload, uint16_t len) {
 
 void BLECamera::handleCameraStatus(const uint8_t *payload, uint16_t len) {
     if (len < sizeof(DJICameraStatus)) return;
-    const auto *status = reinterpret_cast<const DJICameraStatus *>(payload);
+    const auto *s = reinterpret_cast<const DJICameraStatus *>(payload);
 
-    _battery.percent     = status->bat_percent;
-    _battery.voltage     = 0;   // not provided by this BLE interface
-    _battery.current     = 0;
-    _battery.remaining   = 0;
-    _battery.capacity    = 0;
-    _battery.temperature = INT8_MIN;  // unknown
-    _battery.cellCount   = 0;
-    _battery.recording   = (status->camera_status == 0x03);
-    _battery.valid       = true;
+    _camera.percent      = s->bat_percent;
+    _camera.recording    = (s->camera_status == 0x03);
+    _camera.camera_mode  = s->camera_mode;
+    _camera.eis_mode     = s->eis_mode;
+    _camera.temp_over    = s->temp_over;
+    _camera.record_time  = s->record_time;
+    _camera.remain_cap_mb = s->remain_capacity;
+    _camera.remain_time  = s->remain_time;
+    _camera.valid        = true;
 
-    if (_batteryCb) _batteryCb(_battery);
+    if (_cameraCb) _cameraCb(_camera);
 
-    DBG_SERIAL.printf("[DJI] Status: bat=%u%%  mode=0x%02X  status=0x%02X  "
-                      "rec=%us  sd=%uMB  temp=%u\n",
-                      status->bat_percent, status->camera_mode,
-                      status->camera_status, status->record_time,
-                      status->remain_capacity, status->temp_over);
+    DBG_SERIAL.printf("[DJI] bat=%u%%  mode=0x%02X  rec=%s  eis=%u  "
+                      "time=%us  sd=%uMB  remain=%us  temp=%u\n",
+                      s->bat_percent, s->camera_mode,
+                      _camera.recording ? "yes" : "no",
+                      s->eis_mode, s->record_time,
+                      s->remain_capacity, s->remain_time, s->temp_over);
+}
+
+// 0x1D/0x06: newer cameras (Action 5 Pro, etc.) push mode name + params as ASCII.
+// The frame carries two TLV-ish sections at fixed offsets (46 bytes total).
+void BLECamera::handleNewCameraStatus(const uint8_t *payload, uint16_t len) {
+    if (len < 46) return;
+
+    char mode_name[21] = {};
+    char mode_param[21] = {};
+    uint8_t name_len  = payload[1];
+    uint8_t param_len = payload[24];
+    if (name_len  > 20) name_len  = 20;
+    if (param_len > 20) param_len = 20;
+    memcpy(mode_name,  payload + 2,  name_len);
+    memcpy(mode_param, payload + 25, param_len);
+
+    DBG_SERIAL.printf("[DJI] New status: mode=\"%s\"  param=\"%s\"\n",
+                      mode_name, mode_param);
 }
