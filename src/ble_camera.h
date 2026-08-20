@@ -37,6 +37,7 @@ public:
 
     bool startRecording();
     bool stopRecording();
+    bool switchCameraMode(uint8_t mode);  // DJI_MODE_* constants
 
 private:
     // BLE stack callbacks
@@ -65,6 +66,7 @@ private:
     void handleCameraStatus(const uint8_t *payload, uint16_t len);
     void handleNewCameraStatus(const uint8_t *payload, uint16_t len);
     void handleRecordAck(const uint8_t *payload, uint16_t len);
+    void handleModeSwitchAck(const uint8_t *payload, uint16_t len);
 
     // ── Debug ─────────────────────────────────────────────────────────────
     void printServices();

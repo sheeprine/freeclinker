@@ -9,10 +9,14 @@ public:
     struct Config {
         uint32_t disarmStopDelayMs;  // delay between FC disarm and stopping recording
         bool     stopOnDisarm;       // false = never stop recording on disarm
+        uint8_t  auxChannel;         // AUX channel for camera mode switch (0=disabled, 1=AUX1, …)
+        uint8_t  auxMode;            // camera mode when AUX is high (0x0A=hyperlapse)
     };
 
     static constexpr uint32_t DEFAULT_DISARM_STOP_DELAY_MS = 0;
     static constexpr bool     DEFAULT_STOP_ON_DISARM       = true;
+    static constexpr uint8_t  DEFAULT_AUX_CHANNEL          = 0;
+    static constexpr uint8_t  DEFAULT_AUX_MODE             = 0x0A;  // hyperlapse
 
     void begin(Stream &serial);
     void update();

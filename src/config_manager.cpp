@@ -5,6 +5,8 @@
 static constexpr const char *NVS_NS  = "bridge";
 static constexpr const char *KEY_DSD = "disarm_delay";
 static constexpr const char *KEY_SOD = "stop_on_disarm";
+static constexpr const char *KEY_ACH = "aux_channel";
+static constexpr const char *KEY_AMD = "aux_mode";
 
 void ConfigManager::begin(Stream &serial) {
     _serial = &serial;
@@ -17,16 +19,25 @@ void ConfigManager::begin(Stream &serial) {
 void ConfigManager::load() {
     _cfg.disarmStopDelayMs = _prefs.getUInt(KEY_DSD, DEFAULT_DISARM_STOP_DELAY_MS);
     _cfg.stopOnDisarm      = _prefs.getBool(KEY_SOD, DEFAULT_STOP_ON_DISARM);
+    _cfg.auxChannel        = static_cast<uint8_t>(_prefs.getUInt(KEY_ACH, DEFAULT_AUX_CHANNEL));
+    _cfg.auxMode           = static_cast<uint8_t>(_prefs.getUInt(KEY_AMD, DEFAULT_AUX_MODE));
 }
 
 void ConfigManager::save() {
     _prefs.putUInt(KEY_DSD, _cfg.disarmStopDelayMs);
     _prefs.putBool(KEY_SOD, _cfg.stopOnDisarm);
+    _prefs.putUInt(KEY_ACH, _cfg.auxChannel);
+    _prefs.putUInt(KEY_AMD, _cfg.auxMode);
 }
 
 void ConfigManager::printAll() {
     _serial->printf("[cfg] disarm_delay    = %u ms\n", _cfg.disarmStopDelayMs);
     _serial->printf("[cfg] stop_on_disarm  = %s\n", _cfg.stopOnDisarm ? "true" : "false");
+    if (_cfg.auxChannel == 0)
+        _serial->println("[cfg] aux_channel     = disabled");
+    else
+        _serial->printf("[cfg] aux_channel     = AUX%u\n", _cfg.auxChannel);
+    _serial->printf("[cfg] aux_mode        = 0x%02X\n", _cfg.auxMode);
 }
 
 void ConfigManager::handleLine(const char *line) {
@@ -34,10 +45,12 @@ void ConfigManager::handleLine(const char *line) {
 
     if (strcmp(line, "help") == 0) {
         _serial->println("Commands:");
-        _serial->println("  show                   - print all settings");
-        _serial->println("  set disarm_delay <ms>    - delay before stopping recording after disarm");
-        _serial->println("  set stop_on_disarm <0|1> - disable (0) or enable (1) stop on disarm");
-        _serial->println("  reset                  - restore defaults");
+        _serial->println("  show                       - print all settings");
+        _serial->println("  set disarm_delay <ms>      - delay before stopping recording after disarm");
+        _serial->println("  set stop_on_disarm <0|1>   - disable (0) or enable (1) stop on disarm");
+        _serial->println("  set aux_channel <0-12>     - AUX channel for camera mode switch (0=off)");
+        _serial->println("  set aux_mode <0x01-0xFF>   - camera mode when AUX high (0x01=video 0x0A=hyperlapse)");
+        _serial->println("  reset                      - restore defaults");
         return;
     }
 
@@ -73,6 +86,32 @@ void ConfigManager::handleLine(const char *line) {
             _cfg.stopOnDisarm = (strtoul(val, nullptr, 10) != 0);
             save();
             _serial->printf("[cfg] stop_on_disarm = %s (saved)\n", _cfg.stopOnDisarm ? "true" : "false");
+            return;
+        }
+
+        if (strncmp(rest, "aux_channel ", 12) == 0) {
+            const char *val = rest + 12;
+            while (*val == ' ') val++;
+            uint8_t ch = static_cast<uint8_t>(strtoul(val, nullptr, 10));
+            if (ch > 12) {
+                _serial->println("[cfg] aux_channel must be 0-12");
+                return;
+            }
+            _cfg.auxChannel = ch;
+            save();
+            if (ch == 0)
+                _serial->println("[cfg] aux_channel = disabled (saved)");
+            else
+                _serial->printf("[cfg] aux_channel = AUX%u (saved)\n", ch);
+            return;
+        }
+
+        if (strncmp(rest, "aux_mode ", 9) == 0) {
+            const char *val = rest + 9;
+            while (*val == ' ') val++;
+            _cfg.auxMode = static_cast<uint8_t>(strtoul(val, nullptr, 0));  // 0=auto-detect base
+            save();
+            _serial->printf("[cfg] aux_mode = 0x%02X (saved)\n", _cfg.auxMode);
             return;
         }
 

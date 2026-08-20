@@ -40,8 +40,16 @@
 // Camera command IDs (CmdSet 0x1D)
 #define DJI_CMD_STATUS_PUSH     0x02    // camera → ESP32: battery + mode (all cameras)
 #define DJI_CMD_RECORD_CTRL     0x03
+#define DJI_CMD_MODE_SWITCH     0x04    // ESP32 → camera: switch camera mode
 #define DJI_CMD_STATUS_SUB      0x05    // ESP32 → camera: subscribe to status push
 #define DJI_CMD_NEW_STATUS_PUSH 0x06    // camera → ESP32: mode name strings (newer cameras)
+
+// Camera mode values (used in DJICameraStatus.camera_mode and DJICameraModeSwitch.mode)
+#define DJI_MODE_SLOW_MOTION    0x00
+#define DJI_MODE_VIDEO          0x01
+#define DJI_MODE_TIMELAPSE      0x02
+#define DJI_MODE_PHOTO          0x05
+#define DJI_MODE_HYPERLAPSE     0x0A
 
 // Record control actions (CmdSet 0x1D, CmdID 0x03)
 #define DJI_RECORD_START            0x00
@@ -119,6 +127,15 @@ struct __attribute__((packed)) DJIRecordControl {
     uint8_t  reserved[4];           // must be zero
 };
 static_assert(sizeof(DJIRecordControl) == 9, "DJIRecordControl size mismatch");
+
+// Camera mode switch — ESP32 → camera (CmdSet 0x1D, CmdID 0x04)
+// Camera ACKs with ret_code 0 on success; non-zero if rejected (e.g., while recording).
+struct __attribute__((packed)) DJICameraModeSwitch {
+    uint32_t device_id;             // same device_id sent in DJIConnectRequest
+    uint8_t  mode;                  // DJI_MODE_* constant
+    uint8_t  reserved[4];           // must be zero
+};
+static_assert(sizeof(DJICameraModeSwitch) == 9, "DJICameraModeSwitch size mismatch");
 
 // ─── Protocol API ─────────────────────────────────────────────────────────────
 

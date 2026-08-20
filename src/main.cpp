@@ -3,6 +3,7 @@
 #include "config_manager.h"
 #include "ble_camera.h"
 #include "msp_serial.h"
+#include "dji_protocol.h"
 
 static BLECamera     bleCamera;
 static MSPSerial     mspSerial;
@@ -14,6 +15,12 @@ static uint32_t      lastBattMs = 0;
 
 static bool     pendingStop = false;
 static uint32_t disarmMs   = 0;
+
+static void onAuxSwitch(bool high) {
+    const uint8_t mode = high ? configManager.config().auxMode : DJI_MODE_VIDEO;
+    DBG_SERIAL.printf("[main] AUX %s → camera mode 0x%02X\n", high ? "high" : "low", mode);
+    bleCamera.switchCameraMode(mode);
+}
 
 // Called from the BLE stack task — copy + flag only; MSP output on main task.
 static void onCameraData(const CameraData &data) {
@@ -58,6 +65,7 @@ void setup() {
 
     mspSerial.begin(BF_SERIAL);
     mspSerial.setArmCallback(onArmStateChange);
+    mspSerial.setAuxSwitchCallback(onAuxSwitch);
 
     bleCamera.setCameraCallback(onCameraData);
     bleCamera.begin();
@@ -65,6 +73,7 @@ void setup() {
 
 void loop() {
     configManager.update();
+    mspSerial.setAuxChannel(configManager.config().auxChannel);
     bleCamera.update();
     mspSerial.update();
 

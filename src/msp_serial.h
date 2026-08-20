@@ -5,6 +5,7 @@
 // ─── MSP command IDs ─────────────────────────────────────────────────────────
 // Legacy MSP v1 IDs (accepted in MSP v2 frames):
 #define MSP_STATUS                  101   // poll FC arm / flight-mode state
+#define MSP_RC                      105   // poll raw RC channel values (RPYT + AUX1…)
 
 // Betaflight text field setter (msp_protocol_v2_betaflight.h: 0x3007).
 // Direction '<' (command). Payload: textType(1) + textLen(1) + text bytes.
@@ -38,6 +39,10 @@ static_assert(sizeof(MSP2CameraPayload) == 15, "Camera payload size mismatch");
 // Arm-state change notification — called on the main task (from update()).
 using ArmCallback = void (*)(bool armed);
 
+// AUX switch notification: fires on edge (low→high or high→low) of the
+// configured AUX channel crossing the 1500 µs midpoint.
+using AuxSwitchCallback = void (*)(bool high);
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 class MSPSerial {
@@ -60,6 +65,10 @@ public:
     bool isArmed() const { return _armed; }
     void setArmCallback(ArmCallback cb) { _armCb = cb; }
 
+    // AUX switch: channel=0 disables polling, 1=AUX1, 2=AUX2, …
+    void setAuxChannel(uint8_t channel);
+    void setAuxSwitchCallback(AuxSwitchCallback cb) { _auxSwitchCb = cb; }
+
 private:
     // ── TX ────────────────────────────────────────────────────────────────
     // MSP v2 frame: $ X dir | flag(1) cmd(2LE) size(2LE) payload | crc8
@@ -73,6 +82,8 @@ private:
     // ── RX parser ─────────────────────────────────────────────────────────
     void feedByte(uint8_t b);
     void processResponse();
+    void handleStatusResponse();
+    void handleRcResponse();
 
     enum class RxState : uint8_t {
         IDLE, HDR_X, HDR_DIR, FLAG, CMD_LO, CMD_HI, SZ_LO, SZ_HI, PAYLOAD, CRC
@@ -92,8 +103,12 @@ private:
                                   const uint8_t *buf, uint16_t length);
 
     // ── State ─────────────────────────────────────────────────────────────
-    HardwareSerial *_serial     = nullptr;
-    bool            _armed      = false;
-    ArmCallback     _armCb      = nullptr;
-    uint32_t        _lastPollMs = 0;
+    HardwareSerial   *_serial       = nullptr;
+    bool              _armed        = false;
+    ArmCallback       _armCb        = nullptr;
+    uint32_t          _lastPollMs   = 0;
+
+    uint8_t           _auxChannel   = 0;      // 0=disabled, 1=AUX1, …
+    bool              _auxHigh      = false;  // last known state
+    AuxSwitchCallback _auxSwitchCb  = nullptr;
 };

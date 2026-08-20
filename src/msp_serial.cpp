@@ -10,10 +10,10 @@ void MSPSerial::begin(HardwareSerial &serial) {
 // ─── update() — call from loop() ─────────────────────────────────────────────
 
 void MSPSerial::update() {
-    // Poll arm state at 10 Hz
     if (millis() - _lastPollMs >= 100) {
         _lastPollMs = millis();
         sendRequest(MSP_STATUS);
+        if (_auxChannel > 0) sendRequest(MSP_RC);
     }
     while (_serial->available())
         feedByte(static_cast<uint8_t>(_serial->read()));
@@ -97,20 +97,47 @@ void MSPSerial::feedByte(uint8_t b) {
 }
 
 void MSPSerial::processResponse() {
-    if (_rxCmd != MSP_STATUS || _rxSize < 10) return;
+    switch (_rxCmd) {
+        case MSP_STATUS: handleStatusResponse(); break;
+        case MSP_RC:     handleRcResponse();     break;
+    }
+}
 
+void MSPSerial::handleStatusResponse() {
     // MSP_STATUS payload layout:
-    //   [0-1]  cycleTime      uint16
-    //   [2-3]  i2cErrorCount  uint16
-    //   [4-5]  sensorStatus   uint16
+    //   [0-1]  cycleTime       uint16
+    //   [2-3]  i2cErrorCount   uint16
+    //   [4-5]  sensorStatus    uint16
     //   [6-9]  flightModeFlags uint32  ← bit 0 = ARM box active
+    if (_rxSize < 10) return;
     uint32_t flags = 0;
     memcpy(&flags, _rxBuf + 6, sizeof(flags));
     const bool armed = (flags & 0x01) != 0;
-
     if (armed != _armed) {
         _armed = armed;
         if (_armCb) _armCb(_armed);
+    }
+}
+
+void MSPSerial::handleRcResponse() {
+    // MSP_RC payload: N × uint16 LE — Roll, Pitch, Yaw, Throttle, AUX1, AUX2, …
+    // AUX channel N maps to RC index (3 + N), i.e. AUX1 → index 4.
+    if (_auxChannel == 0) return;
+    const uint8_t rcIdx = 3 + _auxChannel;  // AUX1=4, AUX2=5, …
+    if (_rxSize < static_cast<uint16_t>(rcIdx + 1) * 2) return;
+    uint16_t value = 0;
+    memcpy(&value, _rxBuf + rcIdx * 2, sizeof(value));
+    const bool high = (value > 1500);
+    if (high != _auxHigh) {
+        _auxHigh = high;
+        if (_auxSwitchCb) _auxSwitchCb(high);
+    }
+}
+
+void MSPSerial::setAuxChannel(uint8_t channel) {
+    if (channel != _auxChannel) {
+        _auxChannel = channel;
+        _auxHigh    = false;  // reset edge state on channel change
     }
 }
 

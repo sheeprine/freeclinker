@@ -278,6 +278,17 @@ bool BLECamera::stopRecording() {
     return ok;
 }
 
+bool BLECamera::switchCameraMode(uint8_t mode) {
+    DJICameraModeSwitch cmd{};
+    cmd.device_id = _deviceId;
+    cmd.mode      = mode;
+    bool ok = sendFrame(DJI_CMDSET_CAMERA, DJI_CMD_MODE_SWITCH, DJI_CMD,
+                        reinterpret_cast<const uint8_t *>(&cmd), sizeof(cmd),
+                        /*with_rsp=*/true);
+    if (ok) DBG_SERIAL.printf("[DJI] Mode switch 0x%02X sent\n", mode);
+    return ok;
+}
+
 // Step 2 — subscribe to 2 Hz camera status push (battery, mode, temps, …).
 bool BLECamera::sendStatusSubscription() {
     DJIStatusSubscription sub{};
@@ -358,6 +369,9 @@ void BLECamera::dispatchFrame(uint8_t cmd_type, uint8_t cmd_set, uint8_t cmd_id,
     } else if (cmd_set == DJI_CMDSET_CAMERA && cmd_id == DJI_CMD_RECORD_CTRL
                && DJI_IS_ACK(cmd_type)) {
         handleRecordAck(payload, payload_len);
+    } else if (cmd_set == DJI_CMDSET_CAMERA && cmd_id == DJI_CMD_MODE_SWITCH
+               && DJI_IS_ACK(cmd_type)) {
+        handleModeSwitchAck(payload, payload_len);
     } else {
         DBG_SERIAL.printf("[DJI] Unhandled: cs=0x%02X id=0x%02X type=0x%02X\n",
                           cmd_set, cmd_id, cmd_type);
@@ -402,6 +416,14 @@ void BLECamera::handleRecordAck(const uint8_t *payload, uint16_t len) {
         DBG_SERIAL.println("[DJI] Record command OK");
     else
         DBG_SERIAL.printf("[DJI] Record command rejected: ret=0x%02X\n", ret);
+}
+
+void BLECamera::handleModeSwitchAck(const uint8_t *payload, uint16_t len) {
+    uint8_t ret = (len > 0) ? payload[0] : 0xFF;
+    if (ret == 0)
+        DBG_SERIAL.println("[DJI] Mode switch OK");
+    else
+        DBG_SERIAL.printf("[DJI] Mode switch rejected: ret=0x%02X\n", ret);
 }
 
 void BLECamera::handleCameraStatus(const uint8_t *payload, uint16_t len) {
