@@ -1,5 +1,7 @@
-# DJI Action / GoPro → Betaflight Bridge
+# FreeCLinker a DJI Action / GoPro → Betaflight Bridge
 
+FreeCLinker as in Free Cam Linker. Pronounced *freak linker* because we know
+you bunch of freaks like to film yourself doing *illegal* stuff.
 ESP32 firmware that connects a DJI Action or GoPro camera to a Betaflight flight controller.
 
 **→ [Quickstart guide](QUICKSTART.md)** — wiring, build, flash, and web interface setup. The ESP32 bridges the two devices: it receives camera telemetry over BLE and forwards it to the FC via MSP serial, and automatically starts/stops camera recording when the FC arms or disarms.
@@ -32,6 +34,7 @@ Connect the ESP32 to the Betaflight FC UART:
 
 | ESP32 | FC |
 |-------|----|
+| 5V / VCC | 5V |
 | TX (GPIO 17) | RX (any free UART) |
 | RX (GPIO 16) | TX (same UART) |
 | GND | GND |
