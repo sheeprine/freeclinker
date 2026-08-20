@@ -54,7 +54,7 @@ void ConfigManager::handleLine(const char *line) {
         _serial->println("  set disarm_delay <ms>      - delay before stopping recording after disarm");
         _serial->println("  set stop_on_disarm <0|1>   - disable (0) or enable (1) stop on disarm");
         _serial->println("  set aux_channel <0-12>     - AUX channel for camera mode switch (0=off)");
-        _serial->println("  set aux_mode <0x01-0xFF>   - camera mode when AUX high (0x01=video 0x0A=hyperlapse)");
+        _serial->println("  set aux_mode <0x00-0xFF>   - camera mode when AUX high (0x00=slow_motion 0x01=video 0x0A=hyperlapse)");
         _serial->println("  reset                      - restore defaults");
         return;
     }

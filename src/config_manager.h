@@ -10,14 +10,14 @@ public:
         uint32_t disarmStopDelayMs;  // delay between FC disarm and stopping recording
         bool     stopOnDisarm;       // false = never stop recording on disarm
         uint8_t  auxChannel;         // AUX channel for camera mode switch (0=disabled, 1=AUX1, …)
-        uint8_t  auxMode;            // camera mode when AUX is high (0x0A=hyperlapse)
+        uint8_t  auxMode;            // camera mode when AUX is high (0x00=slow motion)
         uint8_t  cameraType;         // 0=DJI, 1=GoPro
     };
 
     static constexpr uint32_t DEFAULT_DISARM_STOP_DELAY_MS = 0;
     static constexpr bool     DEFAULT_STOP_ON_DISARM       = true;
     static constexpr uint8_t  DEFAULT_AUX_CHANNEL          = 0;
-    static constexpr uint8_t  DEFAULT_AUX_MODE             = 0x0A;  // hyperlapse
+    static constexpr uint8_t  DEFAULT_AUX_MODE             = 0x00;  // slow motion
     static constexpr uint8_t  DEFAULT_CAMERA_TYPE          = 0;     // DJI
 
     void begin(Stream &serial);
