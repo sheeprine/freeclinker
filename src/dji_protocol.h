@@ -5,7 +5,6 @@
 // ─── BLE service / characteristic UUIDs (16-bit short form) ─────────────────
 #define DJI_SERVICE_UUID         0xFFF0   // main GATT service
 #define DJI_NOTIFY_CHAR_UUID     0xFFF4   // camera → ESP32  (Notify)
-#define DJI_NOTIFY_CHAR_UUID_ALT 0xFFF3   // fallback notify on DJI Action 5 Pro
 #define DJI_WRITE_CHAR_UUID      0xFFF5   // ESP32  → camera (Write, older cameras)
 #define DJI_WRITE_CHAR_UUID_ALT  0xFFF3   // ESP32  → camera (Write, DJI Action 5 Pro)
 
@@ -36,26 +35,18 @@
 #define DJI_CMDSET_CAMERA   0x1D
 
 // General command IDs (CmdSet 0x00)
-#define DJI_CMD_VERSION     0x00
-#define DJI_CMD_KEY_REPORT  0x11
-#define DJI_CMD_GPS_PUSH    0x17        // ESP32 → camera: push GPS to camera
-#define DJI_CMD_CONNECT     0x19        // ESP32 → camera: connection handshake
+#define DJI_CMD_CONNECT     0x19        // ESP32 ↔ camera: connection handshake
 
 // Camera command IDs (CmdSet 0x1D)
 #define DJI_CMD_STATUS_PUSH 0x02        // camera → ESP32: battery + mode
 #define DJI_CMD_RECORD_CTRL 0x03
-#define DJI_CMD_MODE_SWITCH 0x04
 #define DJI_CMD_STATUS_SUB  0x05        // ESP32 → camera: subscribe to status push
-#define DJI_CMD_NEW_STATUS  0x06
 
 // Record control actions (CmdSet 0x1D, CmdID 0x03)
 #define DJI_RECORD_START            0x00
 #define DJI_RECORD_STOP             0x01
 
-// Status subscription push modes
-#define DJI_PUSH_OFF                0
-#define DJI_PUSH_ONCE               1
-#define DJI_PUSH_PERIODIC           2
+// Status subscription push mode
 #define DJI_PUSH_PERIODIC_ON_CHANGE 3   // 2 Hz + immediate push on any change
 
 // ─── CRC seeds (non-standard, sourced from DJI SDK) ───────────────────────────

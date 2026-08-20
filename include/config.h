@@ -24,8 +24,6 @@
 //
 // Betaflight CLI setup (replace N with the actual UART number):
 //   serial N 0 115200 8 0 0 0   # set UART N to MSP
-//   feature GPS
-//   set gps_provider = MSP
 //   save
 //
 #define BF_SERIAL                   Serial2
@@ -36,9 +34,6 @@
 // ─── Debug serial (USB) ──────────────────────────────────────────────────────
 #define DBG_SERIAL                  Serial
 #define DBG_BAUD                    115200
-
-// How often to re-send the last GPS frame when no new data arrives (ms).
-#define MSP_KEEPALIVE_MS            500
 
 // How often to re-send the last battery frame when no new data arrives (ms).
 // Camera pushes status at 2 Hz once subscribed; this keepalive only fires

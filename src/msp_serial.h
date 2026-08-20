@@ -6,64 +6,20 @@
 // Legacy MSP v1 IDs (accepted in MSP v2 frames):
 #define MSP_STATUS                  101   // poll FC arm / flight-mode state
 
-// Standard Betaflight sensor-injection commands (0x1Fxx range):
-#define MSP2_SENSOR_GPS             0x1F03
-#define MSP2_SENSOR_BAROMETER       0x1F01
-#define MSP2_SENSOR_MAGNETOMETER    0x1F02
-
 // Betaflight text field setter (msp_protocol_v2_betaflight.h: 0x3007).
 // Direction '<' (command). Payload: textType(1) + textLen(1) + text bytes.
 #define MSP2_SET_TEXT               0x3007
 
-// Text type values for MSP2_SET_TEXT / MSP2_GET_TEXT (msp_protocol_v2_betaflight.h)
-#define MSP_TEXT_PILOT_NAME         1
-#define MSP_TEXT_CRAFT_NAME         2
-#define MSP_TEXT_PID_PROFILE_NAME   3
-#define MSP_TEXT_RATE_PROFILE_NAME  4
-#define MSP_TEXT_CUSTOM_1           7   // MSP2TEXT_CUSTOM_MSG_0   — "Custom Message 1" OSD
-#define MSP_TEXT_CUSTOM_2           8   // MSP2TEXT_CUSTOM_MSG_0+1 — "Custom Message 2" OSD
+// Text type values for MSP2_SET_TEXT / MSP2_GET_TEXT
+#define MSP_TEXT_CUSTOM_1           7   // "Custom Message 1" OSD field
+#define MSP_TEXT_CUSTOM_2           8   // "Custom Message 2" OSD field
 
 // Custom vendor command — carries DJI Action camera battery state.
 // Receivers that don't recognise 0x3001 silently ignore the frame.
 #define MSP2_CAMERA_BATTERY         0x3001
 
-// GPS fix-type values expected by Betaflight
-#define MSP_GPS_FIX_NONE    0
-#define MSP_GPS_FIX_2D      2
-#define MSP_GPS_FIX_3D      3
-
-// Sentinel for trueYaw when heading is unavailable
-#define MSP_GPS_YAW_INVALID 36000
-
 // ─── MSP v2 payload structs ───────────────────────────────────────────────────
 // Packed so memcpy onto the wire is safe regardless of compiler padding.
-
-struct __attribute__((packed)) MSP2GpsPayload {
-    uint8_t  instance;                // sensor instance index (0)
-    uint16_t gpsWeek;                 // GPS week number (0 if unknown)
-    uint32_t msTOW;                   // time-of-week in ms (0 if unknown)
-    uint8_t  fixType;                 // MSP_GPS_FIX_*
-    uint8_t  satellitesInView;
-    uint16_t horizontalPosAccuracy;   // mm
-    uint16_t verticalPosAccuracy;     // mm
-    uint16_t horizontalVelAccuracy;   // mm/s
-    uint16_t hdop;                    // * 100
-    int32_t  longitude;               // degrees * 1e7
-    int32_t  latitude;                // degrees * 1e7
-    int32_t  mslAltitude;             // cm
-    int32_t  nedVelNorth;             // cm/s
-    int32_t  nedVelEast;              // cm/s
-    int32_t  nedVelDown;              // cm/s
-    uint16_t groundCourse;            // degrees * 100
-    uint16_t trueYaw;                 // degrees * 100, 36000 = invalid
-    uint16_t year;
-    uint8_t  month;
-    uint8_t  day;
-    uint8_t  hour;
-    uint8_t  min;
-    uint8_t  sec;
-};
-static_assert(sizeof(MSP2GpsPayload) == 52, "GPS payload size mismatch");
 
 // MSP2_CAMERA_BATTERY (0x3001) payload — custom vendor message.
 struct __attribute__((packed)) MSP2CameraBatteryPayload {
@@ -88,9 +44,6 @@ public:
 
     // Call from loop() — polls FC for arm state and drains RX bytes.
     void update();
-
-    // Build and send MSP2_SENSOR_GPS from a TelemetryData snapshot.
-    void sendGPS(const TelemetryData &data);
 
     // Build and send MSP2_CAMERA_BATTERY (0x3001) from a BatteryData snapshot.
     void sendCameraBattery(const BatteryData &data);

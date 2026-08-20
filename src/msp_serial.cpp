@@ -114,53 +114,9 @@ void MSPSerial::processResponse() {
     }
 }
 
-// ─── Public ──────────────────────────────────────────────────────────────────
-
-void MSPSerial::sendGPS(const TelemetryData &data) {
-    MSP2GpsPayload p{};
-
-    p.instance              = 0;
-    p.gpsWeek               = 0;           // unknown — Betaflight uses UTC fields
-    p.msTOW                 = 0;
-    p.fixType               = data.fixType;
-    p.satellitesInView      = data.numSatellites;
-    p.horizontalPosAccuracy = (data.hdop * 10);  // hdop*100 → approx mm accuracy
-    p.verticalPosAccuracy   = (data.hdop * 15);
-    p.horizontalVelAccuracy = 500;               // 5 m/s — conservative default
-    p.hdop                  = data.hdop;
-    p.longitude             = data.longitude;
-    p.latitude              = data.latitude;
-    p.mslAltitude           = data.altitudeMSL;
-    p.nedVelNorth           = data.velNorth;
-    p.nedVelEast            = data.velEast;
-    p.nedVelDown            = data.velDown;
-    p.groundCourse          = data.groundCourse;
-    p.trueYaw               = MSP_GPS_YAW_INVALID;
-    p.year                  = data.year;
-    p.month                 = data.month;
-    p.day                   = data.day;
-    p.hour                  = data.hour;
-    p.min                   = data.minute;
-    p.sec                   = data.second;
-
-    sendFrame(MSP2_SENSOR_GPS,
-              reinterpret_cast<const uint8_t *>(&p),
-              sizeof(p));
-}
-
 // ─── MSP v2 framing ──────────────────────────────────────────────────────────
-//
-// Wire format:
-//   '$'  'X'  '>'  flag(1)  cmd(2 LE)  size(2 LE)  payload(size)  crc8(1)
-//
+// Wire format: '$'  'X'  dir  flag(1)  cmd(2 LE)  size(2 LE)  payload(size)  crc8(1)
 // CRC8/DVB-S2 covers: flag + cmd[0] + cmd[1] + size[0] + size[1] + payload
-//
-// Betaflight CLI setup:
-//   serial <N> 0 115200 8 0 0 0    # configure UART N as MSP
-//   feature GPS
-//   set gps_provider = MSP
-//   save
-//
 void MSPSerial::sendFrame(uint16_t cmd, const uint8_t *payload, uint16_t length, char dir) {
     constexpr uint8_t FLAG = 0x00;
 
