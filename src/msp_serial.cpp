@@ -280,6 +280,50 @@ void MSPSerial::sendSettingsMsg(const CameraData &data) {
     sendCustomText(MSP_TEXT_CUSTOM_3, text);
 }
 
+void MSPSerial::sendStorageMsg(const CameraData &data) {
+    char time_str[8];
+    char space_str[8];
+
+    if (!data.valid) {
+        sendCustomText(MSP_TEXT_CUSTOM_4, "CAM:---");
+        return;
+    }
+
+    // Remaining recording time
+    if (data.remain_time == 0) {
+        snprintf(time_str, sizeof(time_str), "---");
+    } else {
+        uint32_t mins = data.remain_time / 60;
+        if (mins >= 60) {
+            uint32_t hrs = mins / 60;
+            snprintf(time_str, sizeof(time_str), "%luh%02lum",
+                     (unsigned long)hrs, (unsigned long)(mins % 60));
+        } else {
+            snprintf(time_str, sizeof(time_str), "%lum",
+                     (unsigned long)mins);
+        }
+    }
+
+    // SD card free space
+    if (data.remain_cap_mb == 0) {
+        snprintf(space_str, sizeof(space_str), "---");
+    } else if (data.remain_cap_mb >= 1000) {
+        // Show in GB with one decimal place
+        uint32_t gb_int  = data.remain_cap_mb / 1000;
+        uint32_t gb_frac = (data.remain_cap_mb % 1000) / 100;
+        snprintf(space_str, sizeof(space_str), "%lu.%luG",
+                 (unsigned long)gb_int, (unsigned long)gb_frac);
+    } else {
+        snprintf(space_str, sizeof(space_str), "%luM",
+                 (unsigned long)data.remain_cap_mb);
+    }
+
+    // Max 16 chars: "99h59m 9999.9G" = 14 chars
+    char text[17];
+    snprintf(text, sizeof(text), "%-6s %s", time_str, space_str);
+    sendCustomText(MSP_TEXT_CUSTOM_4, text);
+}
+
 void MSPSerial::sendCameraStatus(const CameraData &data) {
     MSP2CameraPayload p{};
     p.percent       = data.percent;

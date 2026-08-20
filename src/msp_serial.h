@@ -15,6 +15,7 @@
 #define MSP_TEXT_CUSTOM_1           7   // "Custom Message 1" OSD field
 #define MSP_TEXT_CUSTOM_2           8   // "Custom Message 2" OSD field
 #define MSP_TEXT_CUSTOM_3           9   // "Custom Message 3" OSD field
+#define MSP_TEXT_CUSTOM_4           10  // "Custom Message 4" OSD field
 
 // Custom vendor command — carries DJI Action camera telemetry.
 // Receivers that don't recognise 0x3001 silently ignore the frame.
@@ -66,6 +67,10 @@ public:
     // Push camera settings (mode, resolution, FPS, EIS) as Custom Message 3.
     // Format: "VID 4K/60 RS+"  Resolution/FPS show "---/--" when not reported.
     void sendSettingsMsg(const CameraData &data);
+
+    // Push remaining recording time and SD free space as Custom Message 4.
+    // Format: "2h03m 12.3G"  Time <1h shown as "45m", space <1GB shown in MB.
+    void sendStorageMsg(const CameraData &data);
 
     bool isArmed() const { return _armed; }
     void setArmCallback(ArmCallback cb) { _armCb = cb; }
