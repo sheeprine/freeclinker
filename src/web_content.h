@@ -104,6 +104,24 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
       gap: 10px; padding: 12px 18px; border-top: 1px solid #e5e7eb;
     }
     .saved-msg { font-size: 12px; color: #16a34a; opacity: 0; transition: opacity 0.4s; margin-right: auto; }
+    #panel-cameras { overflow-y: auto; align-items: center; padding: 28px 16px; }
+    .cam-table { width: 100%; max-width: 560px; border-collapse: collapse; background: #fff;
+                 border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+    .cam-table th { background: #f9fafb; font-size: 11px; color: #6b7280; font-weight: normal;
+                    text-transform: uppercase; letter-spacing: 0.05em;
+                    padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+    .cam-table td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6;
+                    font-size: 12px; vertical-align: middle; }
+    .cam-table tr:last-child td { border-bottom: none; }
+    .cam-table tr:hover td { background: #f9fafb; }
+    .cam-badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 9px;
+                 background: #dbeafe; color: #1d4ed8; margin-left: 4px; }
+    .cam-badge.last  { background: #dcfce7; color: #15803d; }
+    .cam-badge.sel   { background: #fef9c3; color: #854d0e; }
+    .cam-actions { display: flex; gap: 6px; }
+    .cam-empty { color: #6b7280; font-size: 13px; padding: 24px; text-align: center; }
+    .cam-toolbar { width: 100%; max-width: 560px; display: flex; justify-content: flex-end;
+                   gap: 8px; margin-bottom: 10px; }
     #terminal { flex: 1; overflow-y: auto; padding: 12px 16px; background: #1a1a1a; color: #d4d4d4; }
     .line { white-space: pre-wrap; word-break: break-all; line-height: 1.55; }
     .line.sys { color: #6b7280; }
@@ -132,6 +150,7 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
 
 <div class="tab-bar">
   <button class="tab active" data-tab="config">Easy Config</button>
+  <button class="tab"        data-tab="cameras">Cameras</button>
   <button class="tab"        data-tab="cli">CLI</button>
 </div>
 
@@ -290,6 +309,15 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
 
   </div><!-- /panel-config -->
 
+  <!-- Cameras -->
+  <div id="panel-cameras" class="panel">
+    <div class="cam-toolbar">
+      <button id="camRefreshBtn">Refresh</button>
+      <button id="camClearBtn">Clear All</button>
+    </div>
+    <div id="camTableWrap"></div>
+  </div><!-- /panel-cameras -->
+
   <!-- CLI -->
   <div id="panel-cli" class="panel">
     <div id="terminal"></div>
@@ -335,8 +363,9 @@ document.querySelectorAll('.tab').forEach(tab => {
     activeTab = target;
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === tab));
     document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + target));
-    if (target === 'config') loadConfig();
-    if (target === 'cli') setTimeout(() => cmdInput.focus(), 0);
+    if (target === 'config')  loadConfig();
+    if (target === 'cameras') loadCameras();
+    if (target === 'cli')     setTimeout(() => cmdInput.focus(), 0);
   });
 });
 
@@ -487,6 +516,79 @@ function updateDelayEquiv() {
   const ms = parseInt(delayInput.value) || 0;
   delayEquiv.textContent = ms === 0 ? '(immediate)' : `= ${(ms/1000).toFixed(ms%1000===0?0:1)} s`;
 }
+
+// ── Cameras tab ───────────────────────────────────────────────────────────────
+const camTableWrap  = document.getElementById('camTableWrap');
+const camRefreshBtn = document.getElementById('camRefreshBtn');
+const camClearBtn   = document.getElementById('camClearBtn');
+
+async function loadCameras() {
+  try {
+    const r = await fetch('/api/cameras');
+    const list = await r.json();
+    renderCameraTable(list);
+  } catch (e) {
+    camTableWrap.innerHTML = '<div class="cam-empty">Failed to load camera list.</div>';
+  }
+}
+
+function renderCameraTable(list) {
+  if (!list || list.length === 0) {
+    camTableWrap.innerHTML = '<div class="cam-empty">No cameras saved yet.<br>Cameras are added automatically when you connect to them.</div>';
+    return;
+  }
+  let html = '<table class="cam-table"><thead><tr>'
+    + '<th>#</th><th>Name</th><th>Address</th><th>Type</th><th></th>'
+    + '</tr></thead><tbody>';
+  for (const c of list) {
+    const badges = (c.last ? '<span class="cam-badge last">last</span>' : '')
+                 + (c.sel  ? '<span class="cam-badge sel">selected</span>' : '');
+    html += `<tr>
+      <td>${c.idx}</td>
+      <td>${escHtml(c.name)}${badges}</td>
+      <td style="font-family:monospace">${escHtml(c.addr)}</td>
+      <td>${c.type === 1 ? 'GoPro' : 'DJI'}</td>
+      <td class="cam-actions">
+        <button onclick="camConnect(${c.idx})">Connect</button>
+        <button onclick="camRemove(${c.idx})">Remove</button>
+      </td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  camTableWrap.innerHTML = html;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function camCliCmd(cmd) {
+  try {
+    await fetch('/api/cli', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: cmd
+    });
+  } catch (e) { /* ignore */ }
+}
+
+async function camConnect(idx) {
+  await camCliCmd('cameras connect ' + idx);
+  await loadCameras();
+}
+
+async function camRemove(idx) {
+  if (!confirm('Remove camera ' + idx + ' from the list?')) return;
+  await camCliCmd('cameras remove ' + idx);
+  await loadCameras();
+}
+
+camRefreshBtn.addEventListener('click', loadCameras);
+camClearBtn.addEventListener('click', async () => {
+  if (!confirm('Remove all saved cameras?')) return;
+  await camCliCmd('cameras clear');
+  await loadCameras();
+});
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 updateDelayEquiv();

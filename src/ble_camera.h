@@ -77,6 +77,7 @@ private:
     BLEClient                *_client       = nullptr;
     BLERemoteCharacteristic  *_writeChar    = nullptr;
     std::string               _targetAddr;
+    std::string               _targetName;
     esp_ble_addr_type_t       _targetType   = BLE_ADDR_TYPE_PUBLIC;
     bool                      _targetFound  = false;
     bool                      _bleConnected = false;   // BLE layer up
@@ -84,6 +85,11 @@ private:
     bool                      _scanning     = false;
     uint16_t                  _seq          = 0;
     uint32_t                  _lastAttemptMs = 0;
+
+    // First DJI camera seen during scan — fallback when preferred addr isn't found
+    std::string               _candidateAddr;
+    std::string               _candidateName;
+    esp_ble_addr_type_t       _candidateType = BLE_ADDR_TYPE_PUBLIC;
 
     // Deferred connect ACK: set from the notify callback, executed in update()
     // to avoid calling writeValue() from inside a BLE stack callback.

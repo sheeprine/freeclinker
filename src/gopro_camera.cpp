@@ -1,4 +1,5 @@
 #include "gopro_camera.h"
+#include "camera_registry.h"
 #include "config.h"
 #include "dji_protocol.h"  // for DJI_MODE_* constants used in mode mapping
 #include <cstring>
@@ -44,8 +45,10 @@ void GoProCamera::update() {
 // ─── Scan ────────────────────────────────────────────────────────────────────
 
 void GoProCamera::startScan() {
-    _targetFound = false;
-    _scanning    = true;
+    _targetFound   = false;
+    _scanning      = true;
+    _candidateAddr = "";
+    _candidateName = "";
 
     BLEScan *scan = BLEDevice::getScan();
     scan->setAdvertisedDeviceCallbacks(this, false);
@@ -53,7 +56,12 @@ void GoProCamera::startScan() {
     scan->setInterval(0x50);
     scan->setWindow(0x30);
 
-    DBG_SERIAL.println("[BLE] Scanning for GoPro camera...");
+    std::string preferred = _registry ? _registry->preferredAddr() : "";
+    if (preferred.empty())
+        DBG_SERIAL.println("[BLE] Scanning for GoPro camera...");
+    else
+        DBG_SERIAL.printf("[BLE] Scanning for GoPro %s...\n", preferred.c_str());
+
     scan->start(BLE_SCAN_DURATION_SECS, scanDoneCallback, false);
 }
 
@@ -61,11 +69,24 @@ void GoProCamera::scanDoneCallback(BLEScanResults /*r*/) {
     if (!_instance) return;
     _instance->_scanning = false;
     if (!_instance->_targetFound) {
-        DBG_SERIAL.println("[BLE] Scan done — no GoPro found");
-        _instance->_lastAttemptMs = millis();
+        // Preferred camera wasn't seen — fall back to first GoPro found
+        if (!_instance->_candidateAddr.empty()) {
+            DBG_SERIAL.printf("[BLE] Preferred not found — connecting to %s\n",
+                              _instance->_candidateAddr.c_str());
+            _instance->_targetAddr  = _instance->_candidateAddr;
+            _instance->_targetName  = _instance->_candidateName;
+            _instance->_targetType  = _instance->_candidateType;
+            _instance->_targetFound = true;
+        } else {
+            DBG_SERIAL.println("[BLE] Scan done — no GoPro found");
+            _instance->_lastAttemptMs = millis();
+        }
     }
 }
 
+// onResult is called for every advertised device during the scan.
+// If a registry preferred address is set, stop scan early when it is found.
+// Otherwise record the first GoPro found as fallback and keep scanning.
 void GoProCamera::onResult(BLEAdvertisedDevice device) {
     bool isGoPro = false;
 
@@ -93,16 +114,38 @@ void GoProCamera::onResult(BLEAdvertisedDevice device) {
 
     if (!isGoPro) return;
 
-    DBG_SERIAL.printf("[BLE] Found GoPro: \"%s\"  addr=%s  rssi=%d\n",
-                      device.haveName() ? device.getName().c_str() : "?",
-                      device.getAddress().toString().c_str(),
-                      device.getRSSI());
+    std::string addr = device.getAddress().toString();
+    std::string name = device.haveName() ? device.getName() : "GoPro";
 
-    BLEDevice::getScan()->stop();
-    _targetAddr  = device.getAddress().toString();
-    _targetType  = device.getAddressType();
-    _targetFound = true;
-    _scanning    = false;
+    DBG_SERIAL.printf("[BLE] Found GoPro: \"%s\"  addr=%s  rssi=%d\n",
+                      name.c_str(), addr.c_str(), device.getRSSI());
+
+    // Keep first found as fallback
+    if (_candidateAddr.empty()) {
+        _candidateAddr = addr;
+        _candidateName = name;
+        _candidateType = device.getAddressType();
+    }
+
+    std::string preferred = _registry ? _registry->preferredAddr() : "";
+
+    if (!preferred.empty() && addr == preferred) {
+        // Preferred camera found — stop scan immediately
+        BLEDevice::getScan()->stop();
+        _targetAddr  = addr;
+        _targetName  = name;
+        _targetType  = device.getAddressType();
+        _targetFound = true;
+        _scanning    = false;
+    } else if (preferred.empty() && !_targetFound) {
+        // No preference — connect to first found (original behavior)
+        BLEDevice::getScan()->stop();
+        _targetAddr  = addr;
+        _targetName  = name;
+        _targetType  = device.getAddressType();
+        _targetFound = true;
+        _scanning    = false;
+    }
 }
 
 // ─── Connect & characteristic discovery ──────────────────────────────────────
@@ -208,6 +251,11 @@ bool GoProCamera::connectAndSetup() {
     _bleConnected = true;
     DBG_SERIAL.println("[BLE] GoPro BLE connected — querying hardware info");
 
+    // Record this camera in the registry so it is preferred on next boot
+    if (_registry)
+        _registry->onConnected(_targetName.c_str(), _targetAddr.c_str(),
+                               (uint8_t)_targetType, /*GoPro=*/1);
+
     // Kick off handshake; deferred so we're not writing from the connect callback
     _pendingHwInfo = true;
     return true;
@@ -225,6 +273,10 @@ void GoProCamera::onDisconnect(BLEClient * /*c*/) {
     _settingChar   = nullptr;
     _queryChar     = nullptr;
     _targetFound   = false;
+    _targetAddr    = "";
+    _targetName    = "";
+    _candidateAddr = "";
+    _candidateName = "";
     _lastAttemptMs = millis();
     _cmdRx.reset();
     _settingRx.reset();

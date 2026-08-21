@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "config.h"
 #include "config_manager.h"
+#include "camera_registry.h"
 #include "camera.h"
 #include "ble_camera.h"
 #include "gopro_camera.h"
@@ -8,10 +9,11 @@
 #include "dji_protocol.h"
 #include "web_server.h"
 
-static BLECamera    djiCamera;
-static GoProCamera  goProCamera;
-static Camera      *activeCamera = nullptr;
+static BLECamera       djiCamera;
+static GoProCamera     goProCamera;
+static Camera         *activeCamera = nullptr;
 
+static CameraRegistry   cameraRegistry;
 static MSPSerial        mspSerial;
 static ConfigManager    configManager;
 static WebConfigServer  webServer;
@@ -79,7 +81,10 @@ void setup() {
     DBG_SERIAL.begin(DBG_BAUD);
     BF_SERIAL.begin(BF_BAUD, SERIAL_8N1, BF_RX_PIN, BF_TX_PIN);
 
+    cameraRegistry.begin();
+
     configManager.begin(DBG_SERIAL);
+    configManager.setRegistry(&cameraRegistry);
 
     const bool useGoPro = (configManager.config().cameraType == 1);
     activeCamera = useGoPro ? static_cast<Camera *>(&goProCamera)
@@ -94,6 +99,9 @@ void setup() {
     mspSerial.begin(BF_SERIAL);
     mspSerial.setArmCallback(onArmStateChange);
     mspSerial.setAuxSwitchCallback(onAuxSwitch);
+
+    djiCamera.setRegistry(&cameraRegistry);
+    goProCamera.setRegistry(&cameraRegistry);
 
     activeCamera->setCameraCallback(onCameraData);
     activeCamera->begin();
@@ -131,7 +139,7 @@ void loop() {
     if (!webServer.isRunning() && !camConnected &&
         WIFI_AP_START_DELAY_MS > 0 &&
         (now - wifiDelayOriginMs) >= WIFI_AP_START_DELAY_MS) {
-        webServer.begin(configManager, &DBG_SERIAL);
+        webServer.begin(configManager, &cameraRegistry, &DBG_SERIAL);
     }
 
     webServer.update();

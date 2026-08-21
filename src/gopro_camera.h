@@ -75,12 +75,18 @@ private:
     BLERemoteCharacteristic *_settingChar = nullptr;  // GP-0074: setting write
     BLERemoteCharacteristic *_queryChar   = nullptr;  // GP-0076: query write
     std::string              _targetAddr;
+    std::string              _targetName;
     esp_ble_addr_type_t      _targetType  = BLE_ADDR_TYPE_PUBLIC;
     bool                     _targetFound = false;
     bool                     _bleConnected = false;
     bool                     _gpConnected  = false;
     bool                     _scanning     = false;
     uint32_t                 _lastAttemptMs = 0;
+
+    // First GoPro seen during scan — fallback when preferred addr isn't found
+    std::string              _candidateAddr;
+    std::string              _candidateName;
+    esp_ble_addr_type_t      _candidateType = BLE_ADDR_TYPE_PUBLIC;
 
     // Deferred actions (set from notify callbacks, executed in update())
     bool _pendingHwInfo  = false;  // retry Get Hardware Info

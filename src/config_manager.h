@@ -4,6 +4,8 @@
 #include <Stream.h>
 #include <stdint.h>
 
+class CameraRegistry;  // forward declaration
+
 class ConfigManager {
 public:
     static constexpr uint8_t OSD_TPL_LEN = 32;
@@ -33,6 +35,7 @@ public:
 
     void begin(Stream &serial);
     void update();
+    void setRegistry(CameraRegistry *reg) { _registry = reg; }
 
     const Config &config() const { return _cfg; }
 
@@ -52,10 +55,12 @@ private:
     void save();
     void printAll(Stream &out);
     void handleLine(const char *line, Stream &out);
+    void handleCamerasCmd(const char *sub, Stream &out);
 
-    Preferences _prefs;
-    Config      _cfg{};
-    Stream     *_serial = nullptr;
-    char        _buf[80];
-    uint8_t     _len = 0;
+    Preferences     _prefs;
+    Config          _cfg{};
+    CameraRegistry *_registry = nullptr;
+    Stream         *_serial   = nullptr;
+    char            _buf[80];
+    uint8_t         _len = 0;
 };

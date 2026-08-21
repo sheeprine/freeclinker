@@ -4,6 +4,8 @@
 
 using CameraCallback = void (*)(const CameraData &);
 
+class CameraRegistry;  // forward declaration — avoids pulling in registry headers here
+
 // Abstract camera interface implemented by BLECamera (DJI) and GoProCamera.
 class Camera {
 public:
@@ -21,7 +23,9 @@ public:
     virtual bool exitBurstSloMo() { return false; }
 
     void setCameraCallback(CameraCallback cb) { _cameraCb = cb; }
+    void setRegistry(CameraRegistry *reg)     { _registry = reg; }
 
 protected:
-    CameraCallback _cameraCb = nullptr;
+    CameraCallback  _cameraCb = nullptr;
+    CameraRegistry *_registry = nullptr;
 };

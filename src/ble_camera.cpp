@@ -1,4 +1,5 @@
 #include "ble_camera.h"
+#include "camera_registry.h"
 #include "config.h"
 #include <cstring>
 
@@ -50,8 +51,10 @@ void BLECamera::update() {
 // ─── Scan ────────────────────────────────────────────────────────────────────
 
 void BLECamera::startScan() {
-    _targetFound = false;
-    _scanning    = true;
+    _targetFound   = false;
+    _scanning      = true;
+    _candidateAddr = "";
+    _candidateName = "";
 
     BLEScan *scan = BLEDevice::getScan();
     scan->setAdvertisedDeviceCallbacks(this, /*wantDuplicates=*/false);
@@ -59,7 +62,12 @@ void BLECamera::startScan() {
     scan->setInterval(0x50);   // matches DJI SDK scan params
     scan->setWindow(0x30);
 
-    DBG_SERIAL.println("[BLE] Scanning for DJI Action camera...");
+    std::string preferred = _registry ? _registry->preferredAddr() : "";
+    if (preferred.empty())
+        DBG_SERIAL.println("[BLE] Scanning for DJI Action camera...");
+    else
+        DBG_SERIAL.printf("[BLE] Scanning for DJI camera %s...\n", preferred.c_str());
+
     scan->start(BLE_SCAN_DURATION_SECS, scanDoneCallback, false);
 }
 
@@ -67,8 +75,18 @@ void BLECamera::scanDoneCallback(BLEScanResults /*r*/) {
     if (!_instance) return;
     _instance->_scanning = false;
     if (!_instance->_targetFound) {
-        DBG_SERIAL.println("[BLE] Scan done — no DJI camera found");
-        _instance->_lastAttemptMs = millis();
+        // Preferred camera wasn't seen — fall back to first DJI camera found
+        if (!_instance->_candidateAddr.empty()) {
+            DBG_SERIAL.printf("[BLE] Preferred not found — connecting to %s\n",
+                              _instance->_candidateAddr.c_str());
+            _instance->_targetAddr  = _instance->_candidateAddr;
+            _instance->_targetName  = _instance->_candidateName;
+            _instance->_targetType  = _instance->_candidateType;
+            _instance->_targetFound = true;
+        } else {
+            DBG_SERIAL.println("[BLE] Scan done — no DJI camera found");
+            _instance->_lastAttemptMs = millis();
+        }
     }
 }
 
@@ -76,6 +94,10 @@ void BLECamera::scanDoneCallback(BLEScanResults /*r*/) {
 // DJI cameras are identified by manufacturer-specific data bytes
 // [0]=0xAA [1]=0x08 (manufacturer ID 0x08AA) and [4]=0xFA.
 // Device name is used as a fallback if manufacturer data is absent.
+//
+// If the registry has a preferred address, stop scan early when it is found.
+// Otherwise record the first found camera as a fallback and keep scanning
+// in case the preferred device appears later in the window.
 void BLECamera::onResult(BLEAdvertisedDevice device) {
     bool isDJI = false;
 
@@ -96,16 +118,38 @@ void BLECamera::onResult(BLEAdvertisedDevice device) {
 
     if (!isDJI) return;
 
-    DBG_SERIAL.printf("[BLE] Found DJI camera: \"%s\"  addr=%s  rssi=%d\n",
-                      device.haveName() ? device.getName().c_str() : "?",
-                      device.getAddress().toString().c_str(),
-                      device.getRSSI());
+    std::string addr = device.getAddress().toString();
+    std::string name = device.haveName() ? device.getName() : "DJI Action";
 
-    BLEDevice::getScan()->stop();
-    _targetAddr  = device.getAddress().toString();
-    _targetType  = device.getAddressType();
-    _targetFound = true;
-    _scanning    = false;
+    DBG_SERIAL.printf("[BLE] Found DJI camera: \"%s\"  addr=%s  rssi=%d\n",
+                      name.c_str(), addr.c_str(), device.getRSSI());
+
+    // Keep first found as fallback
+    if (_candidateAddr.empty()) {
+        _candidateAddr = addr;
+        _candidateName = name;
+        _candidateType = device.getAddressType();
+    }
+
+    std::string preferred = _registry ? _registry->preferredAddr() : "";
+
+    if (!preferred.empty() && addr == preferred) {
+        // Preferred camera found — stop scan immediately
+        BLEDevice::getScan()->stop();
+        _targetAddr  = addr;
+        _targetName  = name;
+        _targetType  = device.getAddressType();
+        _targetFound = true;
+        _scanning    = false;
+    } else if (preferred.empty() && !_targetFound) {
+        // No preference — connect to first found (original behavior)
+        BLEDevice::getScan()->stop();
+        _targetAddr  = addr;
+        _targetName  = name;
+        _targetType  = device.getAddressType();
+        _targetFound = true;
+        _scanning    = false;
+    }
 }
 
 // ─── Connect & characteristic discovery ──────────────────────────────────────
@@ -180,6 +224,11 @@ bool BLECamera::connectAndSetup() {
 
     _bleConnected = true;
 
+    // Record this camera in the registry so it is preferred on next boot
+    if (_registry)
+        _registry->onConnected(_targetName.c_str(), _targetAddr.c_str(),
+                               (uint8_t)_targetType, /*DJI=*/0);
+
     // Kick off the DJI handshake; response arrives via notify callback
     sendConnectionRequest();
     return true;
@@ -195,6 +244,10 @@ void BLECamera::onDisconnect(BLEClient * /*c*/) {
     _bleConnected  = false;
     _writeChar     = nullptr;
     _targetFound   = false;
+    _targetAddr    = "";
+    _targetName    = "";
+    _candidateAddr = "";
+    _candidateName = "";
     _lastAttemptMs = millis();
 }
 

@@ -1,4 +1,5 @@
 #include "web_server.h"
+#include "camera_registry.h"
 #include "web_content.h"
 #include "config.h"
 
@@ -24,8 +25,9 @@ private:
 
 // ── Public interface ──────────────────────────────────────────────────────────
 
-void WebConfigServer::begin(ConfigManager &cfg, Stream *dbg) {
+void WebConfigServer::begin(ConfigManager &cfg, CameraRegistry *reg, Stream *dbg) {
     _cfg = &cfg;
+    _reg = reg;
     _dbg = dbg;
 
     WiFi.softAP(WIFI_AP_SSID, strlen(WIFI_AP_PASSWORD) ? WIFI_AP_PASSWORD : nullptr,
@@ -36,10 +38,11 @@ void WebConfigServer::begin(ConfigManager &cfg, Stream *dbg) {
                      WIFI_AP_SSID, WiFi.softAPIP().toString().c_str());
     }
 
-    _server.on("/",           HTTP_GET,  [this]() { handleRoot();       });
-    _server.on("/api/config", HTTP_GET,  [this]() { handleGetConfig();  });
-    _server.on("/api/config", HTTP_POST, [this]() { handlePostConfig(); });
-    _server.on("/api/cli",    HTTP_POST, [this]() { handleCli();        });
+    _server.on("/",            HTTP_GET,  [this]() { handleRoot();        });
+    _server.on("/api/config",  HTTP_GET,  [this]() { handleGetConfig();   });
+    _server.on("/api/config",  HTTP_POST, [this]() { handlePostConfig();  });
+    _server.on("/api/cameras", HTTP_GET,  [this]() { handleGetCameras();  });
+    _server.on("/api/cli",     HTTP_POST, [this]() { handleCli();         });
 
     _server.begin();
     _running = true;
@@ -102,6 +105,11 @@ void WebConfigServer::handlePostConfig() {
     if (doc["osd4"].is<const char *>())   _cfg->setOsdTemplate(4, doc["osd4"].as<const char *>());
 
     handleGetConfig();  // return the updated state
+}
+
+void WebConfigServer::handleGetCameras() {
+    String json = _reg ? _reg->toJson() : "[]";
+    _server.send(200, "application/json", json);
 }
 
 void WebConfigServer::handleCli() {

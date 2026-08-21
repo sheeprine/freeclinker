@@ -1,4 +1,5 @@
 #include "config_manager.h"
+#include "camera_registry.h"
 #include "config.h"
 #include <cstring>
 #include <cstdlib>
@@ -89,6 +90,11 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         out.println("  set osd4 <template>        - OSD Custom Message 4 template (default: storage)");
         out.println("  Tokens: {bat} {rec} {mode} {res} {fps} {eis} {rleft} {rcap}");
         out.println("  reset                      - restore defaults");
+        out.println("Camera list commands:");
+        out.println("  cameras list               - list saved cameras");
+        out.println("  cameras connect <idx>      - select camera for next connection");
+        out.println("  cameras remove <idx>       - remove camera from list");
+        out.println("  cameras clear              - remove all saved cameras");
         return;
     }
 
@@ -191,8 +197,68 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         return;
     }
 
+    if (strncmp(line, "cameras", 7) == 0) {
+        const char *sub = line + 7;
+        while (*sub == ' ') sub++;
+        handleCamerasCmd(sub, out);
+        return;
+    }
+
     if (strlen(line) > 0)
         out.printf("[cfg] Unknown command: %s\n", line);
+}
+
+void ConfigManager::handleCamerasCmd(const char *sub, Stream &out) {
+    if (!_registry) {
+        out.println("[reg] Camera registry not available");
+        return;
+    }
+
+    if (strcmp(sub, "list") == 0 || strlen(sub) == 0) {
+        _registry->printList(out);
+        return;
+    }
+
+    if (strcmp(sub, "clear") == 0) {
+        _registry->clear();
+        out.println("[reg] Camera list cleared");
+        return;
+    }
+
+    if (strncmp(sub, "remove ", 7) == 0) {
+        const char *arg = sub + 7;
+        while (*arg == ' ') arg++;
+        uint8_t idx = (uint8_t)strtoul(arg, nullptr, 10);
+        if (_registry->remove(idx))
+            out.printf("[reg] Camera %u removed\n", idx);
+        else
+            out.printf("[reg] No camera at index %u\n", idx);
+        return;
+    }
+
+    if (strncmp(sub, "connect ", 8) == 0) {
+        const char *arg = sub + 8;
+        while (*arg == ' ') arg++;
+        uint8_t idx = (uint8_t)strtoul(arg, nullptr, 10);
+        if (idx < _registry->count()) {
+            _registry->selectCamera(idx);
+            CameraEntry e;
+            _registry->getEntry(idx, e);
+            out.printf("[reg] Camera %u selected: \"%s\" %s — will connect on next scan\n",
+                       idx, e.name, e.addr);
+        } else {
+            out.printf("[reg] No camera at index %u (list has %u entr%s)\n",
+                       idx, _registry->count(),
+                       _registry->count() == 1 ? "y" : "ies");
+        }
+        return;
+    }
+
+    out.println("Camera list commands:");
+    out.println("  cameras list           - list saved cameras");
+    out.println("  cameras connect <idx>  - select camera for next connection");
+    out.println("  cameras remove <idx>   - remove camera from list");
+    out.println("  cameras clear          - remove all saved cameras");
 }
 
 void ConfigManager::processCommand(const char *line, Stream &out) {

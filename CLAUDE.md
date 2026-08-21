@@ -41,7 +41,9 @@ DJI Action / GoPro Camera ←—BLE—→ ESP32 ←—MSP Serial—→ Betafligh
 
 - **`src/main.cpp`** — Wires the layers together. Selects the active camera (`BLECamera` or `GoProCamera`) at startup based on the `cameraType` NVS config, then uses it via the `Camera*` interface. On arm state change, triggers camera recording start/stop. Re-sends telemetry on battery update or keepalive timeout. AUX switch: when GoPro is active and recording, high/low triggers `triggerBurstSloMo` / `exitBurstSloMo`; otherwise calls `switchCameraMode` with the configured `auxMode`.
 
-- **`src/config_manager.cpp`** — Runtime configuration via NVS. Parses serial commands (`help`, `show`, `set <key> <val>`, `reset`). Persisted keys: `camera_type` (0=DJI, 1=GoPro), `disarm_delay`, `stop_on_disarm`, `aux_channel`, `aux_mode` (default `0x00` = slow motion), `osd1_tpl`–`osd4_tpl` (OSD template strings, defaults reproduce the original hardcoded formats).
+- **`src/camera_registry.cpp`** — Persists a list of up to 64 previously connected cameras in NVS namespace `cam_reg`. Each entry stores name, BLE address, address type, and camera type (DJI/GoPro). On startup both camera implementations query the registry for the preferred address (last connected, or manually selected via `cameras connect <idx>`); during scan they stop early when that address is found and fall back to the first available device. `onConnected()` is called after every successful BLE connection to update the list and mark the last-connected entry.
+
+- **`src/config_manager.cpp`** — Runtime configuration via NVS. Parses serial commands (`help`, `show`, `set <key> <val>`, `reset`, `cameras list/connect/remove/clear`). Persisted keys: `camera_type` (0=DJI, 1=GoPro), `disarm_delay`, `stop_on_disarm`, `aux_channel`, `aux_mode` (default `0x00` = slow motion), `osd1_tpl`–`osd4_tpl` (OSD template strings, defaults reproduce the original hardcoded formats).
 
 - **`src/telemetry.h`** — Shared `CameraData` struct used by both camera implementations and MSP output.
 
