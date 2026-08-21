@@ -37,14 +37,11 @@ DJI Action / GoPro Camera ←—BLE—→ ESP32 ←—MSP Serial—→ Betafligh
 
 - **`src/msp_serial.cpp`** — MSP v2 protocol over UART. Polls `MSP_STATUS` (cmd 101) every 100 ms to detect arm state (bit 0 of flight mode flags bytes 6–9). Sends telemetry to Betaflight:
   - `MSP2_CAMERA_BATTERY` (`0x3001`): voltage, current, capacity, temperature
-  - `MSP2_SET_TEXT` Custom Message 1: battery % (`"CAM:###%"`)
-  - `MSP2_SET_TEXT` Custom Message 2: recording state — `"REC  M:SS"` (with elapsed time), `"IDLE"`, or `"CAM:HOT"` (overheating)
-  - `MSP2_SET_TEXT` Custom Message 3: mode/resolution/FPS/EIS — e.g. `"VID 4K/60 RS+"` (up to 16 chars). Mode codes: `SLO`, `VID`, `TL`, `PHO`, `HYP`.
-  - `MSP2_SET_TEXT` Custom Message 4: remaining record time and SD free space — e.g. `"30m    15.2G"`
+  - `MSP2_SET_TEXT` Custom Messages 1–4 via `sendCustomOSD1`–`sendCustomOSD4`, each delegating to the private `sendCustomOSD(textType, data, tpl)` helper. The helper expands a user-configurable template string using `expandTemplate()` and `resolveToken()`. Supported tokens: `{bat}`, `{rec}`, `{mode}`, `{res}`, `{fps}`, `{eis}`, `{rleft}`, `{rcap}`. Default templates reproduce the original hardcoded formats.
 
 - **`src/main.cpp`** — Wires the layers together. Selects the active camera (`BLECamera` or `GoProCamera`) at startup based on the `cameraType` NVS config, then uses it via the `Camera*` interface. On arm state change, triggers camera recording start/stop. Re-sends telemetry on battery update or keepalive timeout. AUX switch: when GoPro is active and recording, high/low triggers `triggerBurstSloMo` / `exitBurstSloMo`; otherwise calls `switchCameraMode` with the configured `auxMode`.
 
-- **`src/config_manager.cpp`** — Runtime configuration via NVS. Parses serial commands (`help`, `show`, `set <key> <val>`, `reset`). Persisted keys: `camera_type` (0=DJI, 1=GoPro), `disarm_delay`, `stop_on_disarm`, `aux_channel`, `aux_mode` (default `0x00` = slow motion).
+- **`src/config_manager.cpp`** — Runtime configuration via NVS. Parses serial commands (`help`, `show`, `set <key> <val>`, `reset`). Persisted keys: `camera_type` (0=DJI, 1=GoPro), `disarm_delay`, `stop_on_disarm`, `aux_channel`, `aux_mode` (default `0x00` = slow motion), `osd1_tpl`–`osd4_tpl` (OSD template strings, defaults reproduce the original hardcoded formats).
 
 - **`src/telemetry.h`** — Shared `CameraData` struct used by both camera implementations and MSP output.
 
