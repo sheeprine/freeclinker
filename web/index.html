@@ -202,6 +202,25 @@
       margin-right: auto;
     }
 
+    /* ── Cameras panel ──────────────────────────────────────────────────────── */
+    #panel-cameras { overflow-y: auto; align-items: center; padding: 28px 16px; }
+    .cam-toolbar { width: 100%; max-width: 560px; display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 10px; }
+    .cam-table { width: 100%; max-width: 560px; border-collapse: collapse; background: #fff;
+                 border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+    .cam-table th { background: #f9fafb; font-size: 11px; color: #6b7280; font-weight: normal;
+                    text-transform: uppercase; letter-spacing: 0.05em;
+                    padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+    .cam-table td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6;
+                    font-size: 12px; vertical-align: middle; }
+    .cam-table tr:last-child td { border-bottom: none; }
+    .cam-table tr:hover td { background: #f9fafb; }
+    .cam-badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 9px;
+                 background: #dbeafe; color: #1d4ed8; margin-left: 4px; }
+    .cam-badge.last { background: #dcfce7; color: #15803d; }
+    .cam-badge.sel  { background: #fef9c3; color: #854d0e; }
+    .cam-actions { display: flex; gap: 6px; }
+    .cam-empty { color: #6b7280; font-size: 13px; padding: 24px; text-align: center; }
+
     /* ── CLI panel ───────────────────────────────────────────────────────────── */
     #terminal {
       flex: 1;
@@ -279,6 +298,7 @@
 <!-- ── Tab bar ── -->
 <div class="tab-bar">
   <button class="tab active" data-tab="config">Easy Config</button>
+  <button class="tab"        data-tab="cameras">Cameras</button>
   <button class="tab"        data-tab="cli">CLI</button>
 </div>
 
@@ -435,6 +455,15 @@
     </div>
   </div>
 
+  <!-- Cameras -->
+  <div id="panel-cameras" class="panel">
+    <div class="cam-toolbar">
+      <button id="camRefreshBtn" disabled>Refresh</button>
+      <button id="camClearBtn"   disabled>Clear All</button>
+    </div>
+    <div id="camTableWrap"></div>
+  </div>
+
   <!-- CLI -->
   <div id="panel-cli" class="panel">
     <div id="terminal"></div>
@@ -483,6 +512,9 @@ const osd3Input      = document.getElementById('osd3');
 const osd4Input      = document.getElementById('osd4');
 const osdApplyBtn    = document.getElementById('osdApplyBtn');
 const osdSavedMsg    = document.getElementById('osdSavedMsg');
+const camTableWrap   = document.getElementById('camTableWrap');
+const camRefreshBtn  = document.getElementById('camRefreshBtn');
+const camClearBtn    = document.getElementById('camClearBtn');
 
 // ── Serial state ──────────────────────────────────────────────────────────────
 let port        = null;
@@ -490,6 +522,11 @@ let writer      = null;
 let reader      = null;
 let keepReading = false;
 let lineBuf     = '';
+
+// ── Camera list capture ───────────────────────────────────────────────────────
+let collectingCams = false;
+let camLines       = [];
+let camTimer       = null;
 
 // ── CLI history ───────────────────────────────────────────────────────────────
 const history = [];
@@ -506,7 +543,8 @@ document.querySelectorAll('.tab').forEach(tab => {
     activeTab = target;
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === tab));
     document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + target));
-    if (target === 'config' && port) sendCommand('show');
+    if (target === 'config'  && port) sendCommand('show');
+    if (target === 'cameras' && port) { startCamCapture(); sendCommand('cameras list'); }
     if (target === 'cli')    setTimeout(() => cmdInput.focus(), 0);
   });
 });
@@ -613,6 +651,7 @@ async function startReading() {
         const clean = line.replace(/\r$/, '');
         log(clean);
         parseConfigLine(clean);
+        collectCameraLine(clean);
       }
     }
   } catch {
@@ -717,6 +756,110 @@ function updateDelayEquiv() {
   delayEquiv.textContent = ms === 0 ? '(immediate)' : `= ${(ms / 1000).toFixed(ms % 1000 === 0 ? 0 : 1)} s`;
 }
 
+// ── Cameras ───────────────────────────────────────────────────────────────────
+function startCamCapture() {
+  collectingCams = true;
+  camLines = [];
+  clearTimeout(camTimer);
+  // Fallback: render after 600 ms even if stream didn't close cleanly
+  camTimer = setTimeout(finalizeCamCapture, 600);
+}
+
+function finalizeCamCapture() {
+  if (!collectingCams) return;
+  collectingCams = false;
+  clearTimeout(camTimer);
+  renderCameraTable(parseCameraLines(camLines));
+}
+
+function collectCameraLine(line) {
+  if (!collectingCams) return;
+  if (line.startsWith('[reg]')) {
+    camLines.push(line);
+    // Reset the fallback timer on each arriving line
+    clearTimeout(camTimer);
+    camTimer = setTimeout(finalizeCamCapture, 200);
+  } else if (line.trim() && camLines.length > 0) {
+    // A non-[reg] line after [reg] lines means the list is done
+    finalizeCamCapture();
+  }
+}
+
+function parseCameraLines(lines) {
+  const cameras = [];
+  for (const line of lines) {
+    // [reg]   N: NAME(28 padded chars)  aa:bb:cc:dd:ee:ff  DJI/GoPro  [tag]
+    const m = line.match(/^\[reg\]\s+(\d+):\s(.+?)\s{2,}([0-9a-fA-F:]{17})\s+(DJI|GoPro)(.*)/);
+    if (m) cameras.push({
+      idx:  parseInt(m[1]),
+      name: m[2].trim(),
+      addr: m[3].trim(),
+      type: m[4].trim(),
+      tags: m[5].trim()
+    });
+  }
+  return cameras;
+}
+
+function renderCameraTable(cameras) {
+  if (!cameras.length) {
+    const empty = camLines.some(l => l.includes('No cameras'));
+    camTableWrap.innerHTML = `<div class="cam-empty">${
+      empty ? 'No cameras saved yet.<br>Cameras are added automatically when you connect to them.'
+            : 'No response — try Refresh.'
+    }</div>`;
+    return;
+  }
+  let html = '<table class="cam-table"><thead><tr>'
+    + '<th>#</th><th>Name</th><th>Address</th><th>Type</th><th></th>'
+    + '</tr></thead><tbody>';
+  for (const c of cameras) {
+    const isLast = c.tags.includes('last');
+    const isSel  = c.tags.includes('sel');
+    const badges = (isLast ? '<span class="cam-badge last">last</span>' : '')
+                 + (isSel  ? '<span class="cam-badge sel">selected</span>' : '');
+    html += `<tr>
+      <td>${c.idx}</td>
+      <td>${escHtml(c.name)}${badges}</td>
+      <td style="font-family:monospace;font-size:11px">${escHtml(c.addr)}</td>
+      <td>${c.type}</td>
+      <td class="cam-actions">
+        <button onclick="camConnect(${c.idx})">Connect</button>
+        <button onclick="camRemove(${c.idx})">Remove</button>
+      </td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  camTableWrap.innerHTML = html;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function camConnect(idx) {
+  await sendCommand(`cameras connect ${idx}`);
+  setTimeout(() => { startCamCapture(); sendCommand('cameras list'); }, 150);
+}
+
+async function camRemove(idx) {
+  if (!confirm(`Remove camera ${idx} from the list?`)) return;
+  await sendCommand(`cameras remove ${idx}`);
+  setTimeout(() => { startCamCapture(); sendCommand('cameras list'); }, 150);
+}
+
+camRefreshBtn.addEventListener('click', () => {
+  if (!port) return;
+  startCamCapture();
+  sendCommand('cameras list');
+});
+
+camClearBtn.addEventListener('click', async () => {
+  if (!port || !confirm('Remove all saved cameras?')) return;
+  await sendCommand('cameras clear');
+  setTimeout(() => { startCamCapture(); sendCommand('cameras list'); }, 150);
+});
+
 // ── UI state ──────────────────────────────────────────────────────────────────
 function setConnected(connected) {
   dot.className          = 'dot' + (connected ? ' connected' : '');
@@ -739,6 +882,8 @@ function setConnected(connected) {
   osd3Input.disabled     = !connected;
   osd4Input.disabled     = !connected;
   osdApplyBtn.disabled   = !connected;
+  camRefreshBtn.disabled = !connected;
+  camClearBtn.disabled   = !connected;
   updateAuxModeState();
 }
 
