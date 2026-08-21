@@ -75,8 +75,8 @@ void BLECamera::scanDoneCallback(BLEScanResults /*r*/) {
     if (!_instance) return;
     _instance->_scanning = false;
     if (!_instance->_targetFound) {
-        // Preferred camera wasn't seen — fall back to first DJI camera found
-        if (!_instance->_candidateAddr.empty()) {
+        if (!_instance->_candidateAddr.empty() && !_instance->_strictCamera) {
+            // Preferred camera wasn't seen — fall back to first DJI camera found
             DBG_SERIAL.printf("[BLE] Preferred not found — connecting to %s\n",
                               _instance->_candidateAddr.c_str());
             _instance->_targetAddr  = _instance->_candidateAddr;
@@ -84,7 +84,10 @@ void BLECamera::scanDoneCallback(BLEScanResults /*r*/) {
             _instance->_targetType  = _instance->_candidateType;
             _instance->_targetFound = true;
         } else {
-            DBG_SERIAL.println("[BLE] Scan done — no DJI camera found");
+            if (_instance->_strictCamera && !_instance->_candidateAddr.empty())
+                DBG_SERIAL.println("[BLE] Preferred not found — strict mode, skipping other cameras");
+            else
+                DBG_SERIAL.println("[BLE] Scan done — no DJI camera found");
             _instance->_lastAttemptMs = millis();
         }
     }

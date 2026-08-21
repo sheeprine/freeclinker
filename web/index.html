@@ -325,6 +325,18 @@
         </select>
       </div>
 
+      <!-- Strict camera -->
+      <div class="cfg-field">
+        <div class="cfg-field-text">
+          <div class="cfg-field-name">Strict camera matching</div>
+          <div class="cfg-field-desc">When on, only connect to the preferred camera. Skip any other camera found during scan.</div>
+        </div>
+        <label class="switch" title="Strict camera matching">
+          <input type="checkbox" id="strictCamera" disabled>
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+
       <!-- Stop on disarm -->
       <div class="cfg-field">
         <div class="cfg-field-text">
@@ -498,7 +510,8 @@ const baudSelect    = document.getElementById('baudRate');
 const readBtn        = document.getElementById('readBtn');
 const applyBtn       = document.getElementById('applyBtn');
 const cameraTypeSel  = document.getElementById('cameraType');
-const stopToggle     = document.getElementById('stopOnDisarm');
+const stopToggle          = document.getElementById('stopOnDisarm');
+const strictCameraToggle  = document.getElementById('strictCamera');
 const delayInput     = document.getElementById('disarmDelay');
 const delayEquiv     = document.getElementById('delayEquiv');
 const savedMsg       = document.getElementById('savedMsg');
@@ -591,6 +604,8 @@ function parseConfigLine(line) {
   } else if (key === 'aux_mode') {
     // "0x0A" — parseInt auto-detects 0x prefix
     auxModeSel.value = parseInt(val).toString();
+  } else if (key === 'strict_camera') {
+    strictCameraToggle.checked = (val === 'true');
   } else if (key === 'osd1') { osd1Input.value = val;
   } else if (key === 'osd2') { osd2Input.value = val;
   } else if (key === 'osd3') { osd3Input.value = val;
@@ -713,9 +728,11 @@ cmdInput.addEventListener('keydown', e => {
 readBtn.addEventListener('click', () => sendCommand('show'));
 
 applyBtn.addEventListener('click', async () => {
-  const delay = parseInt(delayInput.value) || 0;
-  const stop  = stopToggle.checked ? 1 : 0;
+  const delay  = parseInt(delayInput.value) || 0;
+  const stop   = stopToggle.checked ? 1 : 0;
+  const strict = strictCameraToggle.checked ? 1 : 0;
   await sendCommand(`set camera_type ${cameraTypeSel.value}`);
+  await sendCommand(`set strict_camera ${strict}`);
   await sendCommand(`set disarm_delay ${delay}`);
   await sendCommand(`set stop_on_disarm ${stop}`);
   flashSaved(savedMsg);
@@ -873,7 +890,8 @@ function setConnected(connected) {
   readBtn.disabled       = !connected;
   applyBtn.disabled      = !connected;
   cameraTypeSel.disabled = !connected;
-  stopToggle.disabled    = !connected;
+  stopToggle.disabled         = !connected;
+  strictCameraToggle.disabled = !connected;
   delayInput.disabled    = !connected;
   auxChannelSel.disabled = !connected;
   auxApplyBtn.disabled   = !connected;

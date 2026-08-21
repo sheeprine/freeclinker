@@ -139,6 +139,10 @@ void setup() {
     djiCamera.setRegistry(&cameraRegistry);
     goProCamera.setRegistry(&cameraRegistry);
 
+    const bool strict = configManager.config().strictCamera;
+    djiCamera.setStrictCamera(strict);
+    goProCamera.setStrictCamera(strict);
+
     activeCamera->setCameraCallback(onCameraData);
     activeCamera->begin();
 

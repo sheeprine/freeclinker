@@ -24,8 +24,10 @@ public:
 
     void setCameraCallback(CameraCallback cb) { _cameraCb = cb; }
     void setRegistry(CameraRegistry *reg)     { _registry = reg; }
+    void setStrictCamera(bool v)              { _strictCamera = v; }
 
 protected:
-    CameraCallback  _cameraCb = nullptr;
-    CameraRegistry *_registry = nullptr;
+    CameraCallback  _cameraCb     = nullptr;
+    CameraRegistry *_registry     = nullptr;
+    bool            _strictCamera = false;  // when true, skip fallback to first-found camera
 };

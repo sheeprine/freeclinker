@@ -14,6 +14,7 @@ static constexpr const char *KEY_OSD1 = "osd1_tpl";
 static constexpr const char *KEY_OSD2 = "osd2_tpl";
 static constexpr const char *KEY_OSD3 = "osd3_tpl";
 static constexpr const char *KEY_OSD4 = "osd4_tpl";
+static constexpr const char *KEY_SCM  = "strict_cam";
 
 void ConfigManager::begin(Stream &serial) {
     _serial = &serial;
@@ -34,6 +35,7 @@ void ConfigManager::load() {
     _cfg.auxChannel        = static_cast<uint8_t>(_prefs.getUInt(KEY_ACH, DEFAULT_AUX_CHANNEL));
     _cfg.auxMode           = static_cast<uint8_t>(_prefs.getUInt(KEY_AMD, DEFAULT_AUX_MODE));
     _cfg.cameraType        = static_cast<uint8_t>(_prefs.getUInt(KEY_CAM, DEFAULT_CAMERA_TYPE));
+    _cfg.strictCamera      = _prefs.getBool(KEY_SCM, DEFAULT_STRICT_CAMERA);
     loadStr(_prefs, KEY_OSD1, _cfg.osd1Tpl, sizeof(_cfg.osd1Tpl), DEFAULT_OSD1_TPL);
     loadStr(_prefs, KEY_OSD2, _cfg.osd2Tpl, sizeof(_cfg.osd2Tpl), DEFAULT_OSD2_TPL);
     loadStr(_prefs, KEY_OSD3, _cfg.osd3Tpl, sizeof(_cfg.osd3Tpl), DEFAULT_OSD3_TPL);
@@ -46,6 +48,7 @@ void ConfigManager::save() {
     _prefs.putUInt(KEY_ACH, _cfg.auxChannel);
     _prefs.putUInt(KEY_AMD, _cfg.auxMode);
     _prefs.putUInt(KEY_CAM, _cfg.cameraType);
+    _prefs.putBool(KEY_SCM, _cfg.strictCamera);
     _prefs.putString(KEY_OSD1, _cfg.osd1Tpl);
     _prefs.putString(KEY_OSD2, _cfg.osd2Tpl);
     _prefs.putString(KEY_OSD3, _cfg.osd3Tpl);
@@ -54,6 +57,7 @@ void ConfigManager::save() {
 
 void ConfigManager::printAll(Stream &out) {
     out.printf("[cfg] camera_type     = %s\n", _cfg.cameraType == 1 ? "GoPro" : "DJI");
+    out.printf("[cfg] strict_camera   = %s\n", _cfg.strictCamera ? "true" : "false");
     out.printf("[cfg] disarm_delay    = %u ms\n", _cfg.disarmStopDelayMs);
     out.printf("[cfg] stop_on_disarm  = %s\n", _cfg.stopOnDisarm ? "true" : "false");
     if (_cfg.auxChannel == 0)
@@ -80,6 +84,7 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         out.println("  version                    - print firmware version");
         out.println("  show                       - print all settings");
         out.println("  set camera_type <0|1>      - 0=DJI, 1=GoPro (reboot required)");
+        out.println("  set strict_camera <0|1>    - 1=only connect to preferred camera, skip unknown ones");
         out.println("  set disarm_delay <ms>      - delay before stopping recording after disarm");
         out.println("  set stop_on_disarm <0|1>   - disable (0) or enable (1) stop on disarm");
         out.println("  set aux_channel <0-12>     - AUX channel for camera mode switch (0=off)");
@@ -126,6 +131,14 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
             setCameraType(t);
             out.printf("[cfg] camera_type = %s (saved — reboot to apply)\n",
                        t == 1 ? "GoPro" : "DJI");
+            return;
+        }
+
+        if (strncmp(rest, "strict_camera ", 14) == 0) {
+            const char *val = rest + 14;
+            while (*val == ' ') val++;
+            setStrictCamera(strtoul(val, nullptr, 10) != 0);
+            out.printf("[cfg] strict_camera = %s (saved)\n", _cfg.strictCamera ? "true" : "false");
             return;
         }
 
@@ -305,6 +318,11 @@ void ConfigManager::setAuxChannel(uint8_t ch) {
 void ConfigManager::setAuxMode(uint8_t mode) {
     _cfg.auxMode = mode;
     _prefs.putUInt(KEY_AMD, mode);
+}
+
+void ConfigManager::setStrictCamera(bool v) {
+    _cfg.strictCamera = v;
+    _prefs.putBool(KEY_SCM, v);
 }
 
 void ConfigManager::setOsdTemplate(uint8_t n, const char *tpl) {

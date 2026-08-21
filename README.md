@@ -71,6 +71,7 @@ Runtime settings are changed via the USB serial console and persisted across reb
 | Command | Default | Description |
 |---------|---------|-------------|
 | `set camera_type <0\|1>` | 0 | Camera protocol: 0 = DJI, 1 = GoPro (reboot to apply) |
+| `set strict_camera <0\|1>` | 0 | When 1, only connect to the preferred (last-connected) camera; ignore any other camera found during scan |
 | `set stop_on_disarm <0\|1>` | 1 | Stop recording on FC disarm |
 | `set disarm_delay <ms>` | 0 | Delay between disarm and recording stop |
 | `set aux_channel <0-12>` | 0 | AUX channel for camera mode switch (0 = off) |
