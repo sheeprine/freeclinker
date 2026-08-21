@@ -528,10 +528,11 @@ function log(text, cls = '') {
 // ── Config line parser ────────────────────────────────────────────────────────
 function parseConfigLine(line) {
   // "[cfg] disarm_delay    = 5000 ms"  or  "[cfg] stop_on_disarm  = true"
+  // set-command responses append " (saved…)" — strip it before matching
   const m = line.match(/^\[cfg\]\s+(\w+)\s*=\s*(.+)/);
   if (!m) return;
   const key = m[1];
-  const val = m[2].trim();
+  const val = m[2].trim().replace(/\s*\(saved.*/, '');
 
   if (key === 'camera_type') {
     cameraTypeSel.value = val === 'GoPro' ? '1' : '0';
