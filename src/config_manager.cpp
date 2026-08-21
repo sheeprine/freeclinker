@@ -1,4 +1,5 @@
 #include "config_manager.h"
+#include "config.h"
 #include <cstring>
 #include <cstdlib>
 
@@ -68,8 +69,14 @@ void ConfigManager::printAll(Stream &out) {
 void ConfigManager::handleLine(const char *line, Stream &out) {
     while (*line == ' ') line++;
 
+    if (strcmp(line, "version") == 0) {
+        out.printf("[cfg] FreeCLinker firmware v%s\n", FIRMWARE_VERSION);
+        return;
+    }
+
     if (strcmp(line, "help") == 0) {
         out.println("Commands:");
+        out.println("  version                    - print firmware version");
         out.println("  show                       - print all settings");
         out.println("  set camera_type <0|1>      - 0=DJI, 1=GoPro (reboot required)");
         out.println("  set disarm_delay <ms>      - delay before stopping recording after disarm");

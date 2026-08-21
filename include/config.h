@@ -1,5 +1,7 @@
 #pragma once
 
+#define FIRMWARE_VERSION "0.0.2"
+
 // ─── BLE ─────────────────────────────────────────────────────────────────────
 
 // Fallback scan filter used when a device lacks manufacturer data.
