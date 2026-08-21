@@ -57,20 +57,13 @@ public:
     // Build and send MSP2_CAMERA_BATTERY (0x3001) from a CameraData snapshot.
     void sendCameraStatus(const CameraData &data);
 
-    // Format battery % as "CAM:NNN%" and push as Betaflight Custom Message 1.
-    void sendBatteryMsg(const CameraData &data);
-
-    // Push recording state/timer or temperature warning as Custom Message 2.
-    // "REC MM:SS" while recording, "CAM:HOT" on temp warning, else "IDLE".
-    void sendRecordingMsg(const CameraData &data);
-
-    // Push camera settings (mode, resolution, FPS, EIS) as Custom Message 3.
-    // Format: "VID 4K/60 RS+"  Resolution/FPS show "---/--" when not reported.
-    void sendSettingsMsg(const CameraData &data);
-
-    // Push remaining recording time and SD free space as Custom Message 4.
-    // Format: "2h03m 12.3G"  Time <1h shown as "45m", space <1GB shown in MB.
-    void sendStorageMsg(const CameraData &data);
+    // Expand `tpl` with telemetry tokens and push as Betaflight Custom Message N.
+    // Tokens: {bat}=battery%, {rec}=recording state, {mode}/{res}/{fps}/{eis}=settings,
+    //         {rleft}=remaining record time, {rcap}=SD free space.
+    void sendCustomOSD1(const CameraData &data, const char *tpl);
+    void sendCustomOSD2(const CameraData &data, const char *tpl);
+    void sendCustomOSD3(const CameraData &data, const char *tpl);
+    void sendCustomOSD4(const CameraData &data, const char *tpl);
 
     bool isArmed() const { return _armed; }
     void setArmCallback(ArmCallback cb) { _armCb = cb; }
@@ -88,6 +81,8 @@ private:
     void sendRequest(uint16_t cmd);
     // MSP2_SET_TEXT helper: type(1) + text bytes
     void sendCustomText(uint8_t textType, const char *text);
+    // Expand template and send as the given custom OSD slot
+    void sendCustomOSD(uint8_t textType, const CameraData &data, const char *tpl);
 
     // ── RX parser ─────────────────────────────────────────────────────────
     void feedByte(uint8_t b);

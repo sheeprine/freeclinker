@@ -2,12 +2,16 @@
 #include <cstring>
 #include <cstdlib>
 
-static constexpr const char *NVS_NS  = "bridge";
-static constexpr const char *KEY_DSD = "disarm_delay";
-static constexpr const char *KEY_SOD = "stop_on_disarm";
-static constexpr const char *KEY_ACH = "aux_channel";
-static constexpr const char *KEY_AMD = "aux_mode";
-static constexpr const char *KEY_CAM = "camera_type";
+static constexpr const char *NVS_NS   = "bridge";
+static constexpr const char *KEY_DSD  = "disarm_delay";
+static constexpr const char *KEY_SOD  = "stop_on_disarm";
+static constexpr const char *KEY_ACH  = "aux_channel";
+static constexpr const char *KEY_AMD  = "aux_mode";
+static constexpr const char *KEY_CAM  = "camera_type";
+static constexpr const char *KEY_OSD1 = "osd1_tpl";
+static constexpr const char *KEY_OSD2 = "osd2_tpl";
+static constexpr const char *KEY_OSD3 = "osd3_tpl";
+static constexpr const char *KEY_OSD4 = "osd4_tpl";
 
 void ConfigManager::begin(Stream &serial) {
     _serial = &serial;
@@ -17,12 +21,21 @@ void ConfigManager::begin(Stream &serial) {
     printAll(*_serial);
 }
 
+static void loadStr(Preferences &p, const char *key, char *dst, size_t dstLen, const char *def) {
+    String v = p.getString(key, def);
+    strlcpy(dst, v.c_str(), dstLen);
+}
+
 void ConfigManager::load() {
     _cfg.disarmStopDelayMs = _prefs.getUInt(KEY_DSD, DEFAULT_DISARM_STOP_DELAY_MS);
     _cfg.stopOnDisarm      = _prefs.getBool(KEY_SOD, DEFAULT_STOP_ON_DISARM);
     _cfg.auxChannel        = static_cast<uint8_t>(_prefs.getUInt(KEY_ACH, DEFAULT_AUX_CHANNEL));
     _cfg.auxMode           = static_cast<uint8_t>(_prefs.getUInt(KEY_AMD, DEFAULT_AUX_MODE));
     _cfg.cameraType        = static_cast<uint8_t>(_prefs.getUInt(KEY_CAM, DEFAULT_CAMERA_TYPE));
+    loadStr(_prefs, KEY_OSD1, _cfg.osd1Tpl, sizeof(_cfg.osd1Tpl), DEFAULT_OSD1_TPL);
+    loadStr(_prefs, KEY_OSD2, _cfg.osd2Tpl, sizeof(_cfg.osd2Tpl), DEFAULT_OSD2_TPL);
+    loadStr(_prefs, KEY_OSD3, _cfg.osd3Tpl, sizeof(_cfg.osd3Tpl), DEFAULT_OSD3_TPL);
+    loadStr(_prefs, KEY_OSD4, _cfg.osd4Tpl, sizeof(_cfg.osd4Tpl), DEFAULT_OSD4_TPL);
 }
 
 void ConfigManager::save() {
@@ -31,6 +44,10 @@ void ConfigManager::save() {
     _prefs.putUInt(KEY_ACH, _cfg.auxChannel);
     _prefs.putUInt(KEY_AMD, _cfg.auxMode);
     _prefs.putUInt(KEY_CAM, _cfg.cameraType);
+    _prefs.putString(KEY_OSD1, _cfg.osd1Tpl);
+    _prefs.putString(KEY_OSD2, _cfg.osd2Tpl);
+    _prefs.putString(KEY_OSD3, _cfg.osd3Tpl);
+    _prefs.putString(KEY_OSD4, _cfg.osd4Tpl);
 }
 
 void ConfigManager::printAll(Stream &out) {
@@ -42,6 +59,10 @@ void ConfigManager::printAll(Stream &out) {
     else
         out.printf("[cfg] aux_channel     = AUX%u\n", _cfg.auxChannel);
     out.printf("[cfg] aux_mode        = 0x%02X\n", _cfg.auxMode);
+    out.printf("[cfg] osd1            = %s\n", _cfg.osd1Tpl);
+    out.printf("[cfg] osd2            = %s\n", _cfg.osd2Tpl);
+    out.printf("[cfg] osd3            = %s\n", _cfg.osd3Tpl);
+    out.printf("[cfg] osd4            = %s\n", _cfg.osd4Tpl);
 }
 
 void ConfigManager::handleLine(const char *line, Stream &out) {
@@ -55,6 +76,11 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         out.println("  set stop_on_disarm <0|1>   - disable (0) or enable (1) stop on disarm");
         out.println("  set aux_channel <0-12>     - AUX channel for camera mode switch (0=off)");
         out.println("  set aux_mode <0x00-0xFF>   - camera mode when AUX high (0x00=slow_motion 0x01=video 0x0A=hyperlapse)");
+        out.println("  set osd1 <template>        - OSD Custom Message 1 template (default: battery)");
+        out.println("  set osd2 <template>        - OSD Custom Message 2 template (default: recording)");
+        out.println("  set osd3 <template>        - OSD Custom Message 3 template (default: settings)");
+        out.println("  set osd4 <template>        - OSD Custom Message 4 template (default: storage)");
+        out.println("  Tokens: {bat} {rec} {mode} {res} {fps} {eis} {rleft} {rcap}");
         out.println("  reset                      - restore defaults");
         return;
     }
@@ -130,6 +156,30 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
             return;
         }
 
+        if (strncmp(rest, "osd1 ", 5) == 0) {
+            setOsdTemplate(1, rest + 5);
+            out.printf("[cfg] osd1 = %s (saved)\n", _cfg.osd1Tpl);
+            return;
+        }
+
+        if (strncmp(rest, "osd2 ", 5) == 0) {
+            setOsdTemplate(2, rest + 5);
+            out.printf("[cfg] osd2 = %s (saved)\n", _cfg.osd2Tpl);
+            return;
+        }
+
+        if (strncmp(rest, "osd3 ", 5) == 0) {
+            setOsdTemplate(3, rest + 5);
+            out.printf("[cfg] osd3 = %s (saved)\n", _cfg.osd3Tpl);
+            return;
+        }
+
+        if (strncmp(rest, "osd4 ", 5) == 0) {
+            setOsdTemplate(4, rest + 5);
+            out.printf("[cfg] osd4 = %s (saved)\n", _cfg.osd4Tpl);
+            return;
+        }
+
         out.printf("[cfg] Unknown setting: %s\n", rest);
         return;
     }
@@ -182,4 +232,18 @@ void ConfigManager::setAuxChannel(uint8_t ch) {
 void ConfigManager::setAuxMode(uint8_t mode) {
     _cfg.auxMode = mode;
     _prefs.putUInt(KEY_AMD, mode);
+}
+
+void ConfigManager::setOsdTemplate(uint8_t n, const char *tpl) {
+    char *dst;
+    const char *key;
+    switch (n) {
+        case 1: dst = _cfg.osd1Tpl; key = KEY_OSD1; break;
+        case 2: dst = _cfg.osd2Tpl; key = KEY_OSD2; break;
+        case 3: dst = _cfg.osd3Tpl; key = KEY_OSD3; break;
+        case 4: dst = _cfg.osd4Tpl; key = KEY_OSD4; break;
+        default: return;
+    }
+    strlcpy(dst, tpl, OSD_TPL_LEN);
+    _prefs.putString(key, dst);
 }

@@ -151,11 +151,12 @@ void loop() {
 
     if (hasCamera || battKeepalive) {
         hasCamera  = false;
+        const auto &cfg = configManager.config();
         mspSerial.sendCameraStatus(currentCamera);
-        mspSerial.sendBatteryMsg(currentCamera);
-        mspSerial.sendRecordingMsg(currentCamera);
-        mspSerial.sendSettingsMsg(currentCamera);
-        mspSerial.sendStorageMsg(currentCamera);
+        mspSerial.sendCustomOSD1(currentCamera, cfg.osd1Tpl);
+        mspSerial.sendCustomOSD2(currentCamera, cfg.osd2Tpl);
+        mspSerial.sendCustomOSD3(currentCamera, cfg.osd3Tpl);
+        mspSerial.sendCustomOSD4(currentCamera, cfg.osd4Tpl);
         lastBattMs = now;
 
         DBG_SERIAL.printf("[cam] bat=%u%%  mode=0x%02X  rec=%s  eis=%u  "

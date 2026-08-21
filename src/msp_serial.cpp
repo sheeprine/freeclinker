@@ -183,145 +183,126 @@ void MSPSerial::sendCustomText(uint8_t textType, const char *text) {
     sendFrame(MSP2_SET_TEXT, buf, 2 + textLen, '<');
 }
 
-void MSPSerial::sendBatteryMsg(const CameraData &data) {
-    char text[12];
-    if (data.valid)
-        snprintf(text, sizeof(text), "CAM:%3u%%", data.percent);
-    else
-        snprintf(text, sizeof(text), "CAM:---");
-    sendCustomText(MSP_TEXT_CUSTOM_1, text);
-}
+// ─── OSD template engine ─────────────────────────────────────────────────────
 
-void MSPSerial::sendRecordingMsg(const CameraData &data) {
-    char text[12];
-    if (data.temp_over >= 2) {
-        snprintf(text, sizeof(text), "CAM:HOT");
-    } else if (data.recording) {
-        uint16_t mins = data.record_time / 60;
-        uint8_t  secs = data.record_time % 60;
-        snprintf(text, sizeof(text), "REC%3u:%02u", mins, secs);
-    } else {
-        snprintf(text, sizeof(text), "IDLE");
-    }
-    sendCustomText(MSP_TEXT_CUSTOM_2, text);
-}
-
-void MSPSerial::sendSettingsMsg(const CameraData &data) {
-    char text[17];
-
-    if (!data.valid) {
-        sendCustomText(MSP_TEXT_CUSTOM_3, "CAM:---");
-        return;
-    }
-
-    // Camera mode (DJI_MODE_* constants, shared by both drivers)
-    const char *mode;
-    switch (data.camera_mode) {
-        case 0x00: mode = "SLO"; break;
-        case 0x01: mode = "VID"; break;
-        case 0x02: mode = "TL";  break;
-        case 0x05: mode = "PHO"; break;
-        case 0x0A: mode = "HYP"; break;
-        default:   mode = "---"; break;
-    }
-
-    // Resolution from normalized CAM_RES_* code
+static void resolveToken(const char *tok, const CameraData &data,
+                         char *val, size_t valLen) {
     static const char * const res_labels[] = {
-        "480p",  // CAM_RES_480P    0
-        "720p",  // CAM_RES_720P    1
-        "1080",  // CAM_RES_1080P   2
-        "1440",  // CAM_RES_1440P   3
-        "2.7K",  // CAM_RES_2_7K    4
-        "4K",    // CAM_RES_4K      5
-        "4KW",   // CAM_RES_4K_WIDE 6
-        "5.1K",  // CAM_RES_5_1K    7
-        "5.3K",  // CAM_RES_5_3K    8
-        "8K",    // CAM_RES_8K      9
+        "480p", "720p", "1080", "1440", "2.7K", "4K", "4KW", "5.1K", "5.3K", "8K",
     };
-    const char *res = (data.resolution < sizeof(res_labels) / sizeof(res_labels[0]))
-                    ? res_labels[data.resolution] : "---";
-
-    // FPS from normalized CAM_FPS_* code
     static const char * const fps_labels[] = {
-        "24",   // CAM_FPS_24   0
-        "25",   // CAM_FPS_25   1
-        "30",   // CAM_FPS_30   2
-        "48",   // CAM_FPS_48   3
-        "50",   // CAM_FPS_50   4
-        "60",   // CAM_FPS_60   5
-        "90",   // CAM_FPS_90   6
-        "100",  // CAM_FPS_100  7
-        "120",  // CAM_FPS_120  8
-        "200",  // CAM_FPS_200  9
-        "240",  // CAM_FPS_240  10
-        "400",  // CAM_FPS_400  11
+        "24", "25", "30", "48", "50", "60", "90", "100", "120", "200", "240", "400",
     };
-    const char *fps = (data.fps_idx < sizeof(fps_labels) / sizeof(fps_labels[0]))
-                    ? fps_labels[data.fps_idx] : "--";
-
-    // EIS/stabilization from normalized CAM_EIS_* code
     static const char * const eis_labels[] = {
-        "OFF",  // CAM_EIS_OFF   0  DJI off / GoPro OFF
-        "RS",   // CAM_EIS_RS    1  DJI RockSteady
-        "HS",   // CAM_EIS_HS    2  DJI HorizonSteady
-        "RS+",  // CAM_EIS_RS+   3  DJI RockSteady+
-        "HB",   // CAM_EIS_HB    4  DJI HorizonBalance
-        "LOW",  // CAM_EIS_LOW   5  GoPro LOW
-        "HI",   // CAM_EIS_HIGH  6  GoPro HIGH
-        "BST",  // CAM_EIS_BOOST 7  GoPro BOOST
-        "ABS",  // CAM_EIS_AUTO  8  GoPro AUTO_BOOST
-        "STD",  // CAM_EIS_STD   9  GoPro STANDARD
+        "OFF", "RS", "HS", "RS+", "HB", "LOW", "HI", "BST", "ABS", "STD",
     };
-    const char *eis = (data.eis_mode < sizeof(eis_labels) / sizeof(eis_labels[0]))
-                    ? eis_labels[data.eis_mode] : "---";
 
-    // Format: "VID 4K/60 RS+"  max 16 chars: "SLO 5.3K/240 ABS" = 16
-    snprintf(text, sizeof(text), "%-3s %s/%s %s", mode, res, fps, eis);
-    sendCustomText(MSP_TEXT_CUSTOM_3, text);
-}
+    val[0] = '\0';
 
-void MSPSerial::sendStorageMsg(const CameraData &data) {
-    char time_str[8];
-    char space_str[8];
-
-    if (!data.valid) {
-        sendCustomText(MSP_TEXT_CUSTOM_4, "CAM:---");
-        return;
-    }
-
-    // Remaining recording time
-    if (data.remain_time == 0) {
-        snprintf(time_str, sizeof(time_str), "---");
-    } else {
-        uint32_t mins = data.remain_time / 60;
-        if (mins >= 60) {
-            uint32_t hrs = mins / 60;
-            snprintf(time_str, sizeof(time_str), "%luh%02lum",
-                     (unsigned long)hrs, (unsigned long)(mins % 60));
+    if (strcmp(tok, "bat") == 0) {
+        if (data.valid) snprintf(val, valLen, "%3u%%", data.percent);
+        else            snprintf(val, valLen, "---");
+    } else if (strcmp(tok, "rec") == 0) {
+        if (data.temp_over >= 2) {
+            snprintf(val, valLen, "CAM:HOT");
+        } else if (data.recording) {
+            uint16_t mins = data.record_time / 60;
+            uint8_t  secs = data.record_time % 60;
+            snprintf(val, valLen, "REC%3u:%02u", mins, secs);
         } else {
-            snprintf(time_str, sizeof(time_str), "%lum",
-                     (unsigned long)mins);
+            snprintf(val, valLen, "IDLE");
+        }
+    } else if (strcmp(tok, "mode") == 0) {
+        if (!data.valid) { snprintf(val, valLen, "---"); return; }
+        // 3-char left-padded to preserve OSD column alignment
+        switch (data.camera_mode) {
+            case 0x00: snprintf(val, valLen, "SLO"); break;
+            case 0x01: snprintf(val, valLen, "VID"); break;
+            case 0x02: snprintf(val, valLen, "TL "); break;
+            case 0x05: snprintf(val, valLen, "PHO"); break;
+            case 0x0A: snprintf(val, valLen, "HYP"); break;
+            default:   snprintf(val, valLen, "---"); break;
+        }
+    } else if (strcmp(tok, "res") == 0) {
+        if (!data.valid) { snprintf(val, valLen, "---"); return; }
+        const char *r = (data.resolution < sizeof(res_labels) / sizeof(res_labels[0]))
+                      ? res_labels[data.resolution] : "---";
+        snprintf(val, valLen, "%s", r);
+    } else if (strcmp(tok, "fps") == 0) {
+        if (!data.valid) { snprintf(val, valLen, "--"); return; }
+        const char *f = (data.fps_idx < sizeof(fps_labels) / sizeof(fps_labels[0]))
+                      ? fps_labels[data.fps_idx] : "--";
+        snprintf(val, valLen, "%s", f);
+    } else if (strcmp(tok, "eis") == 0) {
+        if (!data.valid) { snprintf(val, valLen, "---"); return; }
+        const char *e = (data.eis_mode < sizeof(eis_labels) / sizeof(eis_labels[0]))
+                      ? eis_labels[data.eis_mode] : "---";
+        snprintf(val, valLen, "%s", e);
+    } else if (strcmp(tok, "rleft") == 0) {
+        if (!data.valid || data.remain_time == 0) {
+            snprintf(val, valLen, "---");
+        } else {
+            uint32_t mins = data.remain_time / 60;
+            if (mins >= 60) {
+                uint32_t hrs = mins / 60;
+                snprintf(val, valLen, "%luh%02lum",
+                         (unsigned long)hrs, (unsigned long)(mins % 60));
+            } else {
+                snprintf(val, valLen, "%lum", (unsigned long)mins);
+            }
+        }
+    } else if (strcmp(tok, "rcap") == 0) {
+        if (!data.valid || data.remain_cap_mb == 0) {
+            snprintf(val, valLen, "---");
+        } else if (data.remain_cap_mb >= 1000) {
+            uint32_t gb_int  = data.remain_cap_mb / 1000;
+            uint32_t gb_frac = (data.remain_cap_mb % 1000) / 100;
+            snprintf(val, valLen, "%lu.%luG",
+                     (unsigned long)gb_int, (unsigned long)gb_frac);
+        } else {
+            snprintf(val, valLen, "%luM", (unsigned long)data.remain_cap_mb);
         }
     }
+}
 
-    // SD card free space
-    if (data.remain_cap_mb == 0) {
-        snprintf(space_str, sizeof(space_str), "---");
-    } else if (data.remain_cap_mb >= 1000) {
-        // Show in GB with one decimal place
-        uint32_t gb_int  = data.remain_cap_mb / 1000;
-        uint32_t gb_frac = (data.remain_cap_mb % 1000) / 100;
-        snprintf(space_str, sizeof(space_str), "%lu.%luG",
-                 (unsigned long)gb_int, (unsigned long)gb_frac);
-    } else {
-        snprintf(space_str, sizeof(space_str), "%luM",
-                 (unsigned long)data.remain_cap_mb);
+static void expandTemplate(const char *tpl, const CameraData &data,
+                           char *out, size_t outLen) {
+    size_t outPos = 0;
+    while (*tpl && outPos < outLen - 1) {
+        if (*tpl == '{') {
+            const char *end = strchr(tpl + 1, '}');
+            if (!end) { out[outPos++] = *tpl++; continue; }
+            char tok[16] = {};
+            size_t tLen = static_cast<size_t>(end - (tpl + 1));
+            if (tLen < sizeof(tok)) {
+                memcpy(tok, tpl + 1, tLen);
+                tok[tLen] = '\0';
+                char val[17] = {};
+                resolveToken(tok, data, val, sizeof(val));
+                size_t vLen = strlen(val);
+                size_t copy = (vLen < outLen - 1 - outPos) ? vLen : (outLen - 1 - outPos);
+                memcpy(out + outPos, val, copy);
+                outPos += copy;
+            }
+            tpl = end + 1;
+        } else {
+            out[outPos++] = *tpl++;
+        }
     }
+    out[outPos] = '\0';
+}
 
-    // Max 16 chars: "99h59m 9999.9G" = 14 chars
-    char text[17];
-    snprintf(text, sizeof(text), "%-6s %s", time_str, space_str);
-    sendCustomText(MSP_TEXT_CUSTOM_4, text);
+// ─── OSD send functions ───────────────────────────────────────────────────────
+
+void MSPSerial::sendCustomOSD1(const CameraData &data, const char *tpl) { sendCustomOSD(MSP_TEXT_CUSTOM_1, data, tpl); }
+void MSPSerial::sendCustomOSD2(const CameraData &data, const char *tpl) { sendCustomOSD(MSP_TEXT_CUSTOM_2, data, tpl); }
+void MSPSerial::sendCustomOSD3(const CameraData &data, const char *tpl) { sendCustomOSD(MSP_TEXT_CUSTOM_3, data, tpl); }
+void MSPSerial::sendCustomOSD4(const CameraData &data, const char *tpl) { sendCustomOSD(MSP_TEXT_CUSTOM_4, data, tpl); }
+
+void MSPSerial::sendCustomOSD(uint8_t textType, const CameraData &data, const char *tpl) {
+    char text[17] = {};
+    expandTemplate(tpl, data, text, sizeof(text));
+    sendCustomText(textType, text);
 }
 
 void MSPSerial::sendCameraStatus(const CameraData &data) {
