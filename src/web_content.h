@@ -15,34 +15,34 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #141414; color: #d4d4d4;
+      background: #f0f2f5; color: #111827;
       font: 14px/1.5 'Courier New', monospace;
       height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
     }
     header {
       display: flex; align-items: center; gap: 12px;
-      padding: 10px 16px; background: #1e1e1e;
-      border-bottom: 1px solid #2d2d2d; flex-shrink: 0;
+      padding: 10px 16px; background: #ffffff;
+      border-bottom: 1px solid #e5e7eb; flex-shrink: 0;
     }
-    .brand { font-size: 13px; font-weight: bold; color: #60a5fa; margin-right: auto; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80;
-           box-shadow: 0 0 6px #4ade8088; flex-shrink: 0; }
-    .hdr-status { font-size: 12px; color: #4ade80; }
+    .brand { font-size: 13px; font-weight: bold; color: #2563eb; margin-right: auto; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a;
+           box-shadow: 0 0 6px #16a34a88; flex-shrink: 0; }
+    .hdr-status { font-size: 12px; color: #16a34a; }
     select {
-      background: #2a2a2a; color: #d4d4d4; border: 1px solid #3a3a3a;
+      background: #ffffff; color: #111827; border: 1px solid #d1d5db;
       border-radius: 4px; padding: 3px 6px; font: inherit; font-size: 12px;
     }
     button {
       font: inherit; font-size: 12px; padding: 4px 12px; border-radius: 4px;
-      border: 1px solid #3a3a3a; background: #2a2a2a; color: #d4d4d4;
+      border: 1px solid #d1d5db; background: #ffffff; color: #374151;
       cursor: pointer; transition: background 0.1s;
     }
-    button:hover:not(:disabled) { background: #383838; }
+    button:hover:not(:disabled) { background: #f9fafb; }
     button:disabled { opacity: 0.35; cursor: default; }
-    button.primary { background: #1d4ed8; border-color: #2563eb; color: #fff; }
-    button.primary:hover:not(:disabled) { background: #2563eb; }
+    button.primary { background: #2563eb; border-color: #1d4ed8; color: #fff; }
+    button.primary:hover:not(:disabled) { background: #1d4ed8; }
     .tab-bar {
-      display: flex; background: #1a1a1a; border-bottom: 1px solid #2d2d2d;
+      display: flex; background: #f9fafb; border-bottom: 1px solid #e5e7eb;
       padding: 0 12px; flex-shrink: 0;
     }
     .tab {
@@ -50,68 +50,76 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
       border-radius: 0; background: transparent; color: #6b7280;
       cursor: pointer; font-size: 13px; margin-bottom: -1px; transition: color 0.1s;
     }
-    .tab:hover { background: transparent; color: #9ca3af; }
-    .tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+    .tab:hover { background: transparent; color: #374151; }
+    .tab.active { color: #2563eb; border-bottom-color: #2563eb; }
     .panels { flex: 1; position: relative; overflow: hidden; }
     .panel { position: absolute; inset: 0; display: none; flex-direction: column; overflow: hidden; }
     .panel.active { display: flex; }
     #panel-config { overflow-y: auto; align-items: center; padding: 28px 16px; }
     .config-card {
-      width: 100%; max-width: 460px; background: #1e1e1e;
-      border: 1px solid #2d2d2d; border-radius: 8px; overflow: hidden;
+      width: 100%; max-width: 460px; background: #ffffff;
+      border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;
+      flex-shrink: 0;
     }
     .card-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 18px; border-bottom: 1px solid #2d2d2d;
+      padding: 14px 18px; border-bottom: 1px solid #e5e7eb;
     }
     .card-header h2 { font-size: 13px; color: #9ca3af; font-weight: normal;
                       letter-spacing: 0.05em; text-transform: uppercase; }
     .cfg-field {
       display: flex; align-items: center; gap: 16px;
-      padding: 16px 18px; border-bottom: 1px solid #252525;
+      padding: 16px 18px; border-bottom: 1px solid #f3f4f6;
     }
     .cfg-field:last-of-type { border-bottom: none; }
     .cfg-field-text { flex: 1; min-width: 0; }
-    .cfg-field-name { font-size: 14px; color: #e2e8f0; margin-bottom: 2px; }
+    .cfg-field-name { font-size: 14px; color: #111827; margin-bottom: 2px; }
     .cfg-field-desc { font-size: 11px; color: #6b7280; line-height: 1.4; }
-    .cfg-field-desc strong { color: #f87171; }
+    .cfg-field-desc strong { color: #dc2626; }
     .switch { position: relative; display: inline-flex; width: 42px; height: 24px; flex-shrink: 0; cursor: pointer; }
     .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
-    .track { width: 42px; height: 24px; background: #374151; border-radius: 12px;
+    .track { width: 42px; height: 24px; background: #d1d5db; border-radius: 12px;
              transition: background 0.2s; position: relative; }
     .thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
-             background: #9ca3af; border-radius: 50%; transition: transform 0.2s, background 0.2s; }
-    .switch input:checked ~ .track { background: #1d4ed8; }
+             background: #ffffff; border-radius: 50%; transition: transform 0.2s, background 0.2s; }
+    .switch input:checked ~ .track { background: #2563eb; }
     .switch input:checked ~ .track .thumb { transform: translateX(18px); background: #fff; }
     .num-wrap { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
     .num-wrap input[type=number] {
-      width: 90px; background: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 4px;
-      color: #d4d4d4; font: inherit; font-size: 14px; padding: 4px 8px; text-align: right;
+      width: 90px; background: #f9fafb; border: 1px solid #d1d5db; border-radius: 4px;
+      color: #111827; font: inherit; font-size: 14px; padding: 4px 8px; text-align: right;
     }
     .num-wrap input[type=number]:focus { outline: none; border-color: #2563eb; }
+    .tpl-input {
+      width: 100%; background: #f9fafb; border: 1px solid #d1d5db; border-radius: 4px;
+      color: #111827; font: inherit; font-size: 13px; padding: 4px 8px; margin-top: 6px;
+    }
+    .tpl-input:focus { outline: none; border-color: #2563eb; }
+    .token-ref { font-size: 11px; color: #6b7280; margin-top: 14px; line-height: 1.6; }
+    .token-ref code { color: #2563eb; }
     .num-unit { color: #6b7280; font-size: 12px; }
-    .num-equiv { color: #4b5563; font-size: 11px; margin-left: 4px; }
+    .num-equiv { color: #9ca3af; font-size: 11px; margin-left: 4px; }
     .card-footer {
       display: flex; align-items: center; justify-content: flex-end;
-      gap: 10px; padding: 12px 18px; border-top: 1px solid #2d2d2d;
+      gap: 10px; padding: 12px 18px; border-top: 1px solid #e5e7eb;
     }
-    .saved-msg { font-size: 12px; color: #4ade80; opacity: 0; transition: opacity 0.4s; margin-right: auto; }
-    #terminal { flex: 1; overflow-y: auto; padding: 12px 16px; }
+    .saved-msg { font-size: 12px; color: #16a34a; opacity: 0; transition: opacity 0.4s; margin-right: auto; }
+    #terminal { flex: 1; overflow-y: auto; padding: 12px 16px; background: #1a1a1a; color: #d4d4d4; }
     .line { white-space: pre-wrap; word-break: break-all; line-height: 1.55; }
     .line.sys { color: #6b7280; }
     .line.cmd { color: #60a5fa; }
     .line.err { color: #f87171; }
     .input-bar {
       display: flex; align-items: center; gap: 8px;
-      padding: 8px 16px; border-top: 1px solid #2d2d2d;
-      background: #1a1a1a; flex-shrink: 0;
+      padding: 8px 16px; border-top: 1px solid #e5e7eb;
+      background: #f9fafb; flex-shrink: 0;
     }
-    .prompt { color: #4b5563; user-select: none; }
+    .prompt { color: #9ca3af; user-select: none; }
     #cmdInput {
       flex: 1; background: transparent; border: none; outline: none;
-      color: #60a5fa; font: inherit; caret-color: #60a5fa;
+      color: #2563eb; font: inherit; caret-color: #2563eb;
     }
-    #cmdInput::placeholder { color: #374151; }
+    #cmdInput::placeholder { color: #d1d5db; }
   </style>
 </head>
 <body>
@@ -230,6 +238,56 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
       </div>
     </div>
 
+    <!-- OSD Templates card -->
+    <div class="config-card" style="margin-top:16px;">
+      <div class="card-header">
+        <h2>OSD Templates</h2>
+      </div>
+
+      <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
+        <div class="cfg-field-name">Custom Message 1</div>
+        <div class="cfg-field-desc">Default: battery percentage</div>
+        <input class="tpl-input" id="osd1" type="text" maxlength="31" spellcheck="false">
+      </div>
+
+      <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
+        <div class="cfg-field-name">Custom Message 2</div>
+        <div class="cfg-field-desc">Default: recording state / elapsed time</div>
+        <input class="tpl-input" id="osd2" type="text" maxlength="31" spellcheck="false">
+      </div>
+
+      <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
+        <div class="cfg-field-name">Custom Message 3</div>
+        <div class="cfg-field-desc">Default: camera mode, resolution, FPS, stabilization</div>
+        <input class="tpl-input" id="osd3" type="text" maxlength="31" spellcheck="false">
+      </div>
+
+      <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
+        <div class="cfg-field-name">Custom Message 4</div>
+        <div class="cfg-field-desc">Default: remaining record time and SD free space</div>
+        <input class="tpl-input" id="osd4" type="text" maxlength="31" spellcheck="false">
+      </div>
+
+      <div class="cfg-field" style="border-bottom:none;padding-top:4px;">
+        <div class="token-ref">
+          Available tokens:
+          <code>{bat}</code> battery % &nbsp;·&nbsp;
+          <code>{rec}</code> recording state &nbsp;·&nbsp;
+          <code>{mode}</code> camera mode &nbsp;·&nbsp;
+          <code>{res}</code> resolution &nbsp;·&nbsp;
+          <code>{fps}</code> frame rate &nbsp;·&nbsp;
+          <code>{eis}</code> stabilization &nbsp;·&nbsp;
+          <code>{rleft}</code> SD time left &nbsp;·&nbsp;
+          <code>{rcap}</code> SD space left
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <span class="saved-msg" id="osdSavedMsg"></span>
+        <button id="osdApplyBtn" class="primary">Apply</button>
+      </div>
+    </div>
+
   </div><!-- /panel-config -->
 
   <!-- CLI -->
@@ -253,6 +311,7 @@ const sendBtn      = document.getElementById('sendBtn');
 const readBtn      = document.getElementById('readBtn');
 const applyBtn     = document.getElementById('applyBtn');
 const auxApplyBtn  = document.getElementById('auxApplyBtn');
+const osdApplyBtn  = document.getElementById('osdApplyBtn');
 const stopToggle   = document.getElementById('stopOnDisarm');
 const delayInput   = document.getElementById('disarmDelay');
 const delayEquiv   = document.getElementById('delayEquiv');
@@ -260,7 +319,12 @@ const savedMsg     = document.getElementById('savedMsg');
 const auxChannelSel = document.getElementById('auxChannel');
 const auxModeSel   = document.getElementById('auxMode');
 const auxSavedMsg  = document.getElementById('auxSavedMsg');
+const osdSavedMsg  = document.getElementById('osdSavedMsg');
 const cameraTypeSel = document.getElementById('cameraType');
+const osd1Input    = document.getElementById('osd1');
+const osd2Input    = document.getElementById('osd2');
+const osd3Input    = document.getElementById('osd3');
+const osd4Input    = document.getElementById('osd4');
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 let activeTab = 'config';
@@ -301,6 +365,10 @@ async function loadConfig() {
     delayInput.value     = j.disarm_delay  ?? 0;
     auxChannelSel.value  = j.aux_channel   ?? 0;
     auxModeSel.value     = j.aux_mode      ?? 0;
+    osd1Input.value      = j.osd1 ?? '';
+    osd2Input.value      = j.osd2 ?? '';
+    osd3Input.value      = j.osd3 ?? '';
+    osd4Input.value      = j.osd4 ?? '';
     updateDelayEquiv();
     updateAuxModeState();
   } catch (e) {
@@ -389,6 +457,19 @@ auxApplyBtn.addEventListener('click', async () => {
 });
 
 auxChannelSel.addEventListener('change', updateAuxModeState);
+
+osdApplyBtn.addEventListener('click', async () => {
+  try {
+    await saveConfig({
+      osd1: osd1Input.value,
+      osd2: osd2Input.value,
+      osd3: osd3Input.value,
+      osd4: osd4Input.value
+    });
+    flashSaved(osdSavedMsg);
+  } catch (e) { console.error(e); }
+});
+
 sendBtn.addEventListener('click', sendCurrent);
 
 function updateAuxModeState() {
