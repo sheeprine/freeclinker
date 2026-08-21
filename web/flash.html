@@ -9,8 +9,8 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: #141414;
-      color: #d4d4d4;
+      background: #f0f2f5;
+      color: #111827;
       font: 14px/1.5 'Courier New', monospace;
       min-height: 100dvh;
       display: flex;
@@ -23,14 +23,14 @@
       align-items: center;
       gap: 16px;
       padding: 10px 16px;
-      background: #1e1e1e;
-      border-bottom: 1px solid #2d2d2d;
+      background: #ffffff;
+      border-bottom: 1px solid #e5e7eb;
       flex-shrink: 0;
     }
 
-    .brand { font-size: 13px; font-weight: bold; color: #60a5fa; margin-right: auto; }
+    .brand { font-size: 13px; font-weight: bold; color: #2563eb; margin-right: auto; }
 
-    a { color: #60a5fa; text-decoration: none; font-size: 12px; }
+    a { color: #2563eb; text-decoration: none; font-size: 12px; }
     a:hover { text-decoration: underline; }
 
     /* ── Main ────────────────────────────────────────────────────────────────── */
@@ -46,8 +46,8 @@
     .card {
       width: 100%;
       max-width: 520px;
-      background: #1e1e1e;
-      border: 1px solid #2d2d2d;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
       border-radius: 8px;
       overflow: hidden;
     }
@@ -58,7 +58,7 @@
       justify-content: space-between;
       gap: 12px;
       padding: 14px 20px;
-      border-bottom: 1px solid #2d2d2d;
+      border-bottom: 1px solid #e5e7eb;
     }
     .card-header h1 { font-size: 13px; color: #9ca3af; font-weight: normal; letter-spacing: 0.05em; text-transform: uppercase; }
 
@@ -72,7 +72,7 @@
       margin-bottom: 24px;
     }
 
-    .version { font-size: 20px; color: #60a5fa; }
+    .version { font-size: 20px; color: #2563eb; }
     .rel-date { font-size: 11px; color: #6b7280; }
 
     /* ── Board cards ─────────────────────────────────────────────────────────── */
@@ -92,17 +92,17 @@
     }
 
     .board-card {
-      border: 1px solid #3a3a3a;
+      border: 1px solid #e5e7eb;
       border-radius: 6px;
       padding: 12px 14px;
       cursor: pointer;
       transition: border-color 0.15s, background 0.15s;
       user-select: none;
     }
-    .board-card:hover { border-color: #555; background: #242424; }
-    .board-card.selected { border-color: #2563eb; background: #162036; }
+    .board-card:hover { border-color: #d1d5db; background: #f9fafb; }
+    .board-card.selected { border-color: #2563eb; background: #eff6ff; }
 
-    .board-name { font-size: 13px; color: #e2e8f0; margin-bottom: 3px; }
+    .board-name { font-size: 13px; color: #111827; margin-bottom: 3px; }
     .board-desc { font-size: 11px; color: #6b7280; line-height: 1.4; }
 
     /* ── Flash section ───────────────────────────────────────────────────────── */
@@ -112,7 +112,7 @@
       align-items: center;
       gap: 14px;
       padding-top: 20px;
-      border-top: 1px solid #252525;
+      border-top: 1px solid #f3f4f6;
     }
 
     /* Override ESP Web Tools button */
@@ -120,25 +120,25 @@
       font: 14px/1.5 'Courier New', monospace;
       padding: 8px 24px;
       border-radius: 4px;
-      border: 1px solid #2563eb;
-      background: #1d4ed8;
+      border: 1px solid #1d4ed8;
+      background: #2563eb;
       color: #fff;
       cursor: pointer;
       transition: background 0.1s;
     }
-    esp-web-install-button::part(button):hover { background: #2563eb; }
+    esp-web-install-button::part(button):hover { background: #1d4ed8; }
 
     .flash-btn {
       font: 14px/1.5 'Courier New', monospace;
       padding: 8px 28px;
       border-radius: 4px;
-      border: 1px solid #2563eb;
-      background: #1d4ed8;
+      border: 1px solid #1d4ed8;
+      background: #2563eb;
       color: #fff;
       cursor: pointer;
       transition: background 0.1s;
     }
-    .flash-btn:hover { background: #2563eb; }
+    .flash-btn:hover { background: #1d4ed8; }
     .flash-btn:disabled { opacity: 0.35; cursor: default; }
 
     .note {
@@ -153,8 +153,8 @@
     .spinner {
       display: inline-block;
       width: 10px; height: 10px;
-      border: 2px solid #3a3a3a;
-      border-top-color: #60a5fa;
+      border: 2px solid #e5e7eb;
+      border-top-color: #2563eb;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       margin-right: 6px;
@@ -162,17 +162,17 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .err { color: #f87171; font-size: 13px; }
+    .err { color: #dc2626; font-size: 13px; }
 
     /* ── No-serial overlay ───────────────────────────────────────────────────── */
     #noSerial {
       display: none;
       position: fixed;
       inset: 0;
-      background: #141414ee;
+      background: #f0f2f5ee;
       place-items: center;
       font-size: 15px;
-      color: #f87171;
+      color: #dc2626;
       text-align: center;
       line-height: 2;
     }
