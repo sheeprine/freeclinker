@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   build-and-release:
@@ -49,3 +50,8 @@ jobs:
         with:
           files: firmware/*
           generate_release_notes: true
+
+      - name: Trigger Pages deployment
+        run: gh workflow run pages.yml --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
