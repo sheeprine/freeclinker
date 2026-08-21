@@ -36,50 +36,26 @@ static bool     forceAP        = false;
 static uint32_t bootBtnPressMs = 0;  // millis() when button first went LOW
 static uint32_t bootBtnLogSec  = 0;  // last second logged during hold
 
-// Status LED: flashes while the WiFi AP is active.
-static bool     ledState   = false;
-static uint32_t lastLedMs  = 0;
+// Status LED: solid when camera connected, single blink every
+// STATUS_LED_FLASH_PERIOD_MS when the WiFi AP is active, off otherwise.
+static bool ledState = false;
 
-// LED behaviour:
-//   camera connected  → solid on  (camera is the primary function)
-//   AP running only   → flashing  (2 Hz, waiting for config)
-//   neither           → off
 static void updateStatusLed(uint32_t now, bool camConnected, bool apRunning) {
-    if (camConnected) {
-        // Solid on — force state without toggling
-        if (!ledState) {
-            ledState = true;
-#if STATUS_LED_RGB
-            neopixelWrite(STATUS_LED_PIN, 0, 0, 32);
-#else
-            digitalWrite(STATUS_LED_PIN, HIGH);
-#endif
-        }
-        return;
-    }
+    bool shouldBeOn;
+    if (apRunning)
+        shouldBeOn = (now % STATUS_LED_AP_PERIOD_MS) < STATUS_LED_AP_ON_MS;
+    else if (camConnected)
+        shouldBeOn = true;
+    else
+        shouldBeOn = (now % STATUS_LED_SCAN_PERIOD_MS) < STATUS_LED_SCAN_ON_MS;
 
-    if (!apRunning) {
-        if (ledState) {
-            ledState = false;
-#if STATUS_LED_RGB
-            neopixelWrite(STATUS_LED_PIN, 0, 0, 0);
+    if (shouldBeOn == ledState) return;
+    ledState = shouldBeOn;
+#if STATUS_LED_ACTIVE_LOW
+    digitalWrite(STATUS_LED_PIN, ledState ? LOW : HIGH);
 #else
-            digitalWrite(STATUS_LED_PIN, LOW);
+    digitalWrite(STATUS_LED_PIN, ledState ? HIGH : LOW);
 #endif
-        }
-        return;
-    }
-
-    // AP running, no camera — flash
-    if (now - lastLedMs >= STATUS_LED_INTERVAL_MS) {
-        lastLedMs = now;
-        ledState  = !ledState;
-#if STATUS_LED_RGB
-        neopixelWrite(STATUS_LED_PIN, 0, 0, ledState ? 32 : 0);
-#else
-        digitalWrite(STATUS_LED_PIN, ledState ? HIGH : LOW);
-#endif
-    }
 }
 
 static void onAuxSwitch(bool high) {
@@ -149,8 +125,10 @@ void setup() {
                       WIFI_AP_SSID, WIFI_AP_START_DELAY_MS / 1000);
 
     pinMode(WIFI_FORCE_AP_PIN, INPUT_PULLUP);
-#if !STATUS_LED_RGB
     pinMode(STATUS_LED_PIN, OUTPUT);
+#if STATUS_LED_ACTIVE_LOW
+    digitalWrite(STATUS_LED_PIN, HIGH); // active-LOW: HIGH = off
+#else
     digitalWrite(STATUS_LED_PIN, LOW);
 #endif
 

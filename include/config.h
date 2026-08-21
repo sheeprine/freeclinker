@@ -77,14 +77,16 @@
 // ─── Status LED ──────────────────────────────────────────────────────────────
 //
 // Flashes while the WiFi AP is active.
-// ESP32-C3 Super Mini: WS2812B RGB LED on GPIO8, driven via neopixelWrite().
-// ESP32 DevKit:        simple GPIO LED on GPIO2 (LED_BUILTIN).
+// ESP32-C3 Super Mini: blue LED on GPIO8 (simple GPIO, active HIGH).
+// ESP32 DevKit:        blue LED on GPIO2 (LED_BUILTIN, active HIGH).
 //
 #ifdef CONFIG_IDF_TARGET_ESP32C3
-#define STATUS_LED_PIN        8     // WS2812B RGB LED
-#define STATUS_LED_RGB        1     // 1 = use neopixelWrite(), 0 = digitalWrite()
+#define STATUS_LED_PIN        8     // blue LED on ESP32-C3 Super Mini
 #else
-#define STATUS_LED_PIN        2     // onboard LED (LED_BUILTIN)
-#define STATUS_LED_RGB        0
+#define STATUS_LED_PIN        2     // onboard LED on ESP32 DevKit
 #endif
-#define STATUS_LED_INTERVAL_MS  250 // toggle interval in ms → 2 Hz flash (250 on / 250 off)
+#define STATUS_LED_ACTIVE_LOW 1          // ESP32-C3 Super Mini blue LED is active-LOW
+#define STATUS_LED_AP_ON_MS         100  // fast blink (AP active): on-time per cycle
+#define STATUS_LED_AP_PERIOD_MS     200  // fast blink (AP active): full cycle duration
+#define STATUS_LED_SCAN_ON_MS       100  // slow blink (searching camera): on-time
+#define STATUS_LED_SCAN_PERIOD_MS  3000  // slow blink (searching camera): full cycle
