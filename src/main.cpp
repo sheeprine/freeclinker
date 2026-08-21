@@ -36,6 +36,52 @@ static bool     forceAP        = false;
 static uint32_t bootBtnPressMs = 0;  // millis() when button first went LOW
 static uint32_t bootBtnLogSec  = 0;  // last second logged during hold
 
+// Status LED: flashes while the WiFi AP is active.
+static bool     ledState   = false;
+static uint32_t lastLedMs  = 0;
+
+// LED behaviour:
+//   camera connected  → solid on  (camera is the primary function)
+//   AP running only   → flashing  (2 Hz, waiting for config)
+//   neither           → off
+static void updateStatusLed(uint32_t now, bool camConnected, bool apRunning) {
+    if (camConnected) {
+        // Solid on — force state without toggling
+        if (!ledState) {
+            ledState = true;
+#if STATUS_LED_RGB
+            neopixelWrite(STATUS_LED_PIN, 0, 0, 32);
+#else
+            digitalWrite(STATUS_LED_PIN, HIGH);
+#endif
+        }
+        return;
+    }
+
+    if (!apRunning) {
+        if (ledState) {
+            ledState = false;
+#if STATUS_LED_RGB
+            neopixelWrite(STATUS_LED_PIN, 0, 0, 0);
+#else
+            digitalWrite(STATUS_LED_PIN, LOW);
+#endif
+        }
+        return;
+    }
+
+    // AP running, no camera — flash
+    if (now - lastLedMs >= STATUS_LED_INTERVAL_MS) {
+        lastLedMs = now;
+        ledState  = !ledState;
+#if STATUS_LED_RGB
+        neopixelWrite(STATUS_LED_PIN, 0, 0, ledState ? 32 : 0);
+#else
+        digitalWrite(STATUS_LED_PIN, ledState ? HIGH : LOW);
+#endif
+    }
+}
+
 static void onAuxSwitch(bool high) {
     const bool isGoPro = (configManager.config().cameraType == 1);
     if (isGoPro && currentCamera.recording) {
@@ -103,6 +149,10 @@ void setup() {
                       WIFI_AP_SSID, WIFI_AP_START_DELAY_MS / 1000);
 
     pinMode(WIFI_FORCE_AP_PIN, INPUT_PULLUP);
+#if !STATUS_LED_RGB
+    pinMode(STATUS_LED_PIN, OUTPUT);
+    digitalWrite(STATUS_LED_PIN, LOW);
+#endif
 
     mspSerial.begin(BF_SERIAL);
     mspSerial.setArmCallback(onArmStateChange);
@@ -213,6 +263,8 @@ void loop() {
                           currentCamera.remain_cap_mb, currentCamera.remain_time,
                           currentCamera.temp_over);
     }
+
+    updateStatusLed(now, camConnected, webServer.isRunning());
 
     delay(10);
 }

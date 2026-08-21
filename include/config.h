@@ -73,3 +73,18 @@
 #define WIFI_FORCE_AP_PIN         0       // BOOT/FLASH button on ESP32 DevKit
 #endif
 #define WIFI_FORCE_AP_HOLD_MS     5000    // hold duration in ms (default 5 s)
+
+// ─── Status LED ──────────────────────────────────────────────────────────────
+//
+// Flashes while the WiFi AP is active.
+// ESP32-C3 Super Mini: WS2812B RGB LED on GPIO8, driven via neopixelWrite().
+// ESP32 DevKit:        simple GPIO LED on GPIO2 (LED_BUILTIN).
+//
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+#define STATUS_LED_PIN        8     // WS2812B RGB LED
+#define STATUS_LED_RGB        1     // 1 = use neopixelWrite(), 0 = digitalWrite()
+#else
+#define STATUS_LED_PIN        2     // onboard LED (LED_BUILTIN)
+#define STATUS_LED_RGB        0
+#endif
+#define STATUS_LED_INTERVAL_MS  250 // toggle interval in ms → 2 Hz flash (250 on / 250 off)
