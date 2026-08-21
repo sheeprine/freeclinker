@@ -27,8 +27,14 @@ static uint32_t disarmMs   = 0;
 
 // Timestamp used to compute the WiFi AP start delay.
 // Reset to millis() whenever a camera disconnects so the countdown restarts.
-static uint32_t wifiDelayOriginMs = 0;
+static uint32_t wifiDelayOriginMs  = 0;
 static bool     cameraWasConnected = false;
+
+// Force-AP: set when BOOT button is held for WIFI_FORCE_AP_HOLD_MS.
+// Once set, the AP stays on until the next reboot even if a camera connects.
+static bool     forceAP        = false;
+static uint32_t bootBtnPressMs = 0;  // millis() when button first went LOW
+static uint32_t bootBtnLogSec  = 0;  // last second logged during hold
 
 static void onAuxSwitch(bool high) {
     const bool isGoPro = (configManager.config().cameraType == 1);
@@ -96,6 +102,8 @@ void setup() {
     DBG_SERIAL.printf("[main] WiFi AP '%s' starts in %u s if no camera connects\n",
                       WIFI_AP_SSID, WIFI_AP_START_DELAY_MS / 1000);
 
+    pinMode(WIFI_FORCE_AP_PIN, INPUT_PULLUP);
+
     mspSerial.begin(BF_SERIAL);
     mspSerial.setArmCallback(onArmStateChange);
     mspSerial.setAuxSwitchCallback(onAuxSwitch);
@@ -118,16 +126,44 @@ void loop() {
     const uint32_t now          = millis();
     const bool     camConnected = activeCamera->isConnected();
 
+    // ── BOOT button → force AP ─────────────────────────────────────────────────
+    if (!forceAP) {
+        if (digitalRead(WIFI_FORCE_AP_PIN) == LOW) {
+            if (bootBtnPressMs == 0) {
+                bootBtnPressMs = now;
+                bootBtnLogSec  = 0;
+                DBG_SERIAL.printf("[wifi] BOOT held — keep holding for %u s to force AP\n",
+                                  WIFI_FORCE_AP_HOLD_MS / 1000);
+            }
+            uint32_t heldMs  = now - bootBtnPressMs;
+            uint32_t heldSec = heldMs / 1000;
+            if (heldSec != bootBtnLogSec && heldSec > 0) {
+                bootBtnLogSec = heldSec;
+                DBG_SERIAL.printf("[wifi] BOOT holding... %u/%u s\n",
+                                  heldSec, WIFI_FORCE_AP_HOLD_MS / 1000);
+            }
+            if (heldMs >= WIFI_FORCE_AP_HOLD_MS) {
+                forceAP        = true;
+                bootBtnPressMs = 0;
+                DBG_SERIAL.println("[wifi] Forcing WiFi AP mode until reboot");
+                if (!webServer.isRunning())
+                    webServer.begin(configManager, &cameraRegistry, &DBG_SERIAL);
+            }
+        } else {
+            bootBtnPressMs = 0;
+        }
+    }
+
     // ── WiFi AP lifecycle ──────────────────────────────────────────────────────
     if (camConnected && !cameraWasConnected) {
-        // Camera just connected — tear down the AP if it is running.
-        if (webServer.isRunning()) {
+        // Camera just connected — tear down the AP unless forced on.
+        if (webServer.isRunning() && !forceAP) {
             DBG_SERIAL.println("[wifi] Camera connected — stopping AP");
             webServer.stop();
         }
     }
 
-    if (!camConnected && cameraWasConnected) {
+    if (!camConnected && cameraWasConnected && !forceAP) {
         // Camera just disconnected — restart the countdown.
         DBG_SERIAL.printf("[wifi] Camera disconnected — AP starts in %u s\n",
                           WIFI_AP_START_DELAY_MS / 1000);
@@ -136,7 +172,9 @@ void loop() {
 
     cameraWasConnected = camConnected;
 
-    if (!webServer.isRunning() && !camConnected &&
+    if (!webServer.isRunning() &&
+        !forceAP &&
+        !camConnected &&
         WIFI_AP_START_DELAY_MS > 0 &&
         (now - wifiDelayOriginMs) >= WIFI_AP_START_DELAY_MS) {
         webServer.begin(configManager, &cameraRegistry, &DBG_SERIAL);

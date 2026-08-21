@@ -60,3 +60,16 @@
 #define WIFI_AP_PASSWORD          ""              // empty = open network
 #define WIFI_AP_CHANNEL           1
 #define WIFI_AP_START_DELAY_MS    30000           // 30 s
+
+// ─── BOOT-button force-AP ────────────────────────────────────────────────────
+//
+// Hold this GPIO LOW for WIFI_FORCE_AP_HOLD_MS to force the WiFi AP on
+// until the next reboot, regardless of camera connection state.
+// This is the BOOT/FLASH button present on most ESP32 dev boards.
+//
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+#define WIFI_FORCE_AP_PIN         9       // BOOT button on ESP32-C3 Super Mini
+#else
+#define WIFI_FORCE_AP_PIN         0       // BOOT/FLASH button on ESP32 DevKit
+#endif
+#define WIFI_FORCE_AP_HOLD_MS     5000    // hold duration in ms (default 5 s)
