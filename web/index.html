@@ -338,19 +338,6 @@
         </select>
       </div>
 
-      <!-- Caddx Wi-Fi credentials (Caddx Orca has no BLE pairing — it's a Wi-Fi CGI camera) -->
-      <!-- Hidden until camera type = Caddx Orca, see updateCameraTypeState() -->
-      <div class="cfg-field" id="caddxWifiField" style="flex-direction:column; align-items:flex-start; display:none;">
-        <div class="cfg-field-name">Caddx Wi-Fi network</div>
-        <div class="cfg-field-desc">The camera's own Wi-Fi SSID/password (same network you'd join from the phone's Wi-Fi settings for the CaddxFPV app). <strong>Reboot required to apply.</strong></div>
-        <div class="num-wrap" style="width:100%;">
-          <input class="tpl-input" id="caddxSsid" type="text" placeholder="SSID" maxlength="32" spellcheck="false" disabled style="margin-top:0;flex:1;width:auto;">
-          <button id="caddxScanBtn" type="button" disabled>Scan</button>
-        </div>
-        <div id="caddxScanResults" class="wifi-results"></div>
-        <input class="tpl-input" id="caddxPass" type="text" placeholder="Password" maxlength="63" spellcheck="false" disabled>
-      </div>
-
       <!-- Strict camera -->
       <div class="cfg-field">
         <div class="cfg-field-text">
@@ -507,6 +494,27 @@
 
   <!-- Cameras -->
   <div id="panel-cameras" class="panel">
+    <!-- Caddx Wi-Fi credentials (Caddx Orca has no BLE pairing — it's a Wi-Fi CGI camera) -->
+    <!-- Hidden unless camera type = Caddx Orca, see updateCameraTypeState() -->
+    <div class="config-card" id="caddxWifiCard" style="width:100%;max-width:560px;margin-bottom:16px;display:none;">
+      <div class="card-header">
+        <h2>Caddx Wi-Fi Network</h2>
+      </div>
+      <div class="cfg-field" style="flex-direction:column; align-items:flex-start;">
+        <div class="cfg-field-desc">The camera's own Wi-Fi SSID/password (same network you'd join from the phone's Wi-Fi settings for the CaddxFPV app). Saving adds it to the list below. <strong>Reboot required to apply.</strong></div>
+        <div class="num-wrap" style="width:100%;">
+          <input class="tpl-input" id="caddxSsid" type="text" placeholder="SSID" maxlength="32" spellcheck="false" disabled style="margin-top:0;flex:1;width:auto;">
+          <button id="caddxScanBtn" type="button" disabled>Scan</button>
+        </div>
+        <div id="caddxScanResults" class="wifi-results"></div>
+        <input class="tpl-input" id="caddxPass" type="text" placeholder="Password" maxlength="63" spellcheck="false" disabled>
+      </div>
+      <div class="card-footer">
+        <span class="saved-msg" id="caddxSavedMsg"></span>
+        <button id="caddxApplyBtn" class="primary" disabled>Save</button>
+      </div>
+    </div>
+
     <div class="cam-toolbar">
       <button id="camRefreshBtn" disabled>Refresh</button>
       <button id="camClearBtn"   disabled>Clear All</button>
@@ -548,11 +556,13 @@ const baudSelect    = document.getElementById('baudRate');
 const readBtn        = document.getElementById('readBtn');
 const applyBtn       = document.getElementById('applyBtn');
 const cameraTypeSel  = document.getElementById('cameraType');
-const caddxWifiField    = document.getElementById('caddxWifiField');
+const caddxWifiCard     = document.getElementById('caddxWifiCard');
 const caddxSsidInput    = document.getElementById('caddxSsid');
 const caddxPassInput    = document.getElementById('caddxPass');
 const caddxScanBtn      = document.getElementById('caddxScanBtn');
 const caddxScanResults  = document.getElementById('caddxScanResults');
+const caddxApplyBtn     = document.getElementById('caddxApplyBtn');
+const caddxSavedMsg     = document.getElementById('caddxSavedMsg');
 const stopToggle          = document.getElementById('stopOnDisarm');
 const strictCameraToggle  = document.getElementById('strictCamera');
 const debugBleToggle      = document.getElementById('debugBle');
@@ -782,14 +792,6 @@ applyBtn.addEventListener('click', async () => {
   const stop   = stopToggle.checked ? 1 : 0;
   const strict = strictCameraToggle.checked ? 1 : 0;
   await sendCommand(`set camera_type ${cameraTypeSel.value}`);
-  if (caddxSsidInput.value) await sendCommand(`set caddx_ssid ${caddxSsidInput.value}`);
-  // Password is write-only (never read back from the device) — only send it
-  // if the user actually typed something, so a blank field doesn't wipe a
-  // previously saved password on every Apply click.
-  if (caddxPassInput.value) {
-    await sendCommand(`set caddx_pass ${caddxPassInput.value}`);
-    caddxPassInput.value = '';
-  }
   const debugBle = debugBleToggle.checked ? 1 : 0;
   await sendCommand(`set strict_camera ${strict}`);
   await sendCommand(`set debug_ble ${debugBle}`);
@@ -800,8 +802,22 @@ applyBtn.addEventListener('click', async () => {
 
 cameraTypeSel.addEventListener('change', updateCameraTypeState);
 function updateCameraTypeState() {
-  caddxWifiField.style.display = parseInt(cameraTypeSel.value) === 2 ? 'flex' : 'none';
+  caddxWifiCard.style.display = parseInt(cameraTypeSel.value) === 2 ? 'block' : 'none';
 }
+
+caddxApplyBtn.addEventListener('click', async () => {
+  if (caddxSsidInput.value) await sendCommand(`set caddx_ssid ${caddxSsidInput.value}`);
+  // Password is write-only (never read back from the device) — only send it
+  // if the user actually typed something, so a blank field doesn't wipe a
+  // previously saved password on every Save click.
+  if (caddxPassInput.value) {
+    await sendCommand(`set caddx_pass ${caddxPassInput.value}`);
+    caddxPassInput.value = '';
+  }
+  flashSaved(caddxSavedMsg);
+  startCamCapture();
+  sendCommand('cameras list');
+});
 
 auxApplyBtn.addEventListener('click', async () => {
   const ch   = auxChannelSel.value;
@@ -1061,6 +1077,7 @@ function setConnected(connected) {
   caddxSsidInput.disabled = !connected;
   caddxPassInput.disabled = !connected;
   caddxScanBtn.disabled   = !connected;
+  caddxApplyBtn.disabled  = !connected;
   stopToggle.disabled         = !connected;
   strictCameraToggle.disabled = !connected;
   debugBleToggle.disabled     = !connected;

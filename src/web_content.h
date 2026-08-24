@@ -191,18 +191,6 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
         </select>
       </div>
 
-      <!-- Caddx Wi-Fi credentials (Caddx Orca has no BLE pairing — it's a Wi-Fi CGI camera) -->
-      <div class="cfg-field" id="caddxWifiField" style="flex-direction:column;align-items:flex-start;display:none;">
-        <div class="cfg-field-name">Caddx Wi-Fi network</div>
-        <div class="cfg-field-desc">The camera's own Wi-Fi SSID/password (same network you'd join from the phone's Wi-Fi settings for the CaddxFPV app). <strong>Reboot required to apply.</strong></div>
-        <div class="num-wrap" style="width:100%;">
-          <input class="tpl-input" id="caddxSsid" type="text" placeholder="SSID" maxlength="32" spellcheck="false" style="margin-top:0;flex:1;width:auto;">
-          <button id="caddxScanBtn" type="button">Scan</button>
-        </div>
-        <div id="caddxScanResults" class="wifi-results"></div>
-        <input class="tpl-input" id="caddxPass" type="text" placeholder="Password (default: 12345678)" maxlength="63" spellcheck="false">
-      </div>
-
       <!-- Stop on disarm -->
       <div class="cfg-field">
         <div class="cfg-field-text">
@@ -336,6 +324,27 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
 
   <!-- Cameras -->
   <div id="panel-cameras" class="panel">
+    <!-- Caddx Wi-Fi credentials (Caddx Orca has no BLE pairing — it's a Wi-Fi CGI camera) -->
+    <!-- Hidden unless camera type = Caddx Orca, see updateCameraTypeState() -->
+    <div class="config-card" id="caddxWifiCard" style="width:100%;max-width:560px;margin-bottom:16px;display:none;">
+      <div class="card-header">
+        <h2>Caddx Wi-Fi Network</h2>
+      </div>
+      <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
+        <div class="cfg-field-desc">The camera's own Wi-Fi SSID/password (same network you'd join from the phone's Wi-Fi settings for the CaddxFPV app). Saving adds it to the list below. <strong>Reboot required to apply.</strong></div>
+        <div class="num-wrap" style="width:100%;">
+          <input class="tpl-input" id="caddxSsid" type="text" placeholder="SSID" maxlength="32" spellcheck="false" style="margin-top:0;flex:1;width:auto;">
+          <button id="caddxScanBtn" type="button">Scan</button>
+        </div>
+        <div id="caddxScanResults" class="wifi-results"></div>
+        <input class="tpl-input" id="caddxPass" type="text" placeholder="Password (default: 12345678)" maxlength="63" spellcheck="false">
+      </div>
+      <div class="card-footer">
+        <span class="saved-msg" id="caddxSavedMsg"></span>
+        <button id="caddxApplyBtn" class="primary">Save</button>
+      </div>
+    </div>
+
     <div class="cam-toolbar">
       <button id="camRefreshBtn">Refresh</button>
       <button id="camClearBtn">Clear All</button>
@@ -374,11 +383,13 @@ const auxModeSel   = document.getElementById('auxMode');
 const auxSavedMsg  = document.getElementById('auxSavedMsg');
 const osdSavedMsg  = document.getElementById('osdSavedMsg');
 const cameraTypeSel = document.getElementById('cameraType');
-const caddxWifiField    = document.getElementById('caddxWifiField');
+const caddxWifiCard     = document.getElementById('caddxWifiCard');
 const caddxSsidInput    = document.getElementById('caddxSsid');
 const caddxPassInput    = document.getElementById('caddxPass');
 const caddxScanBtn      = document.getElementById('caddxScanBtn');
 const caddxScanResults  = document.getElementById('caddxScanResults');
+const caddxApplyBtn     = document.getElementById('caddxApplyBtn');
+const caddxSavedMsg     = document.getElementById('caddxSavedMsg');
 const osd1Input    = document.getElementById('osd1');
 const osd2Input    = document.getElementById('osd2');
 const osd3Input    = document.getElementById('osd3');
@@ -500,21 +511,29 @@ applyBtn.addEventListener('click', async () => {
   try {
     const data = {
       camera_type:    parseInt(cameraTypeSel.value),
-      caddx_ssid:     caddxSsidInput.value,
       stop_on_disarm: stopToggle.checked,
       disarm_delay:   parseInt(delayInput.value) || 0
     };
-    if (caddxPassInput.value) data.caddx_pass = caddxPassInput.value;
     await saveConfig(data);
-    caddxPassInput.value = '';
     flashSaved(savedMsg);
   } catch (e) { console.error(e); }
 });
 
 cameraTypeSel.addEventListener('change', updateCameraTypeState);
 function updateCameraTypeState() {
-  caddxWifiField.style.display = parseInt(cameraTypeSel.value) === 2 ? 'flex' : 'none';
+  caddxWifiCard.style.display = parseInt(cameraTypeSel.value) === 2 ? 'block' : 'none';
 }
+
+caddxApplyBtn.addEventListener('click', async () => {
+  try {
+    const data = { caddx_ssid: caddxSsidInput.value };
+    if (caddxPassInput.value) data.caddx_pass = caddxPassInput.value;
+    await saveConfig(data);
+    caddxPassInput.value = '';
+    flashSaved(caddxSavedMsg);
+    loadCameras();
+  } catch (e) { console.error(e); }
+});
 
 caddxScanBtn.addEventListener('click', async () => {
   caddxScanBtn.disabled = true;
