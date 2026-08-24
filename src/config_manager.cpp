@@ -15,6 +15,8 @@ static constexpr const char *KEY_OSD2 = "osd2_tpl";
 static constexpr const char *KEY_OSD3 = "osd3_tpl";
 static constexpr const char *KEY_OSD4 = "osd4_tpl";
 static constexpr const char *KEY_SCM  = "strict_cam";
+static constexpr const char *KEY_CSSID = "caddx_ssid";
+static constexpr const char *KEY_CPASS = "caddx_pass";
 
 void ConfigManager::begin(Stream &serial) {
     _serial = &serial;
@@ -40,6 +42,8 @@ void ConfigManager::load() {
     loadStr(_prefs, KEY_OSD2, _cfg.osd2Tpl, sizeof(_cfg.osd2Tpl), DEFAULT_OSD2_TPL);
     loadStr(_prefs, KEY_OSD3, _cfg.osd3Tpl, sizeof(_cfg.osd3Tpl), DEFAULT_OSD3_TPL);
     loadStr(_prefs, KEY_OSD4, _cfg.osd4Tpl, sizeof(_cfg.osd4Tpl), DEFAULT_OSD4_TPL);
+    loadStr(_prefs, KEY_CSSID, _cfg.caddxSsid, sizeof(_cfg.caddxSsid), DEFAULT_CADDX_SSID);
+    loadStr(_prefs, KEY_CPASS, _cfg.caddxPass, sizeof(_cfg.caddxPass), DEFAULT_CADDX_PASS);
 }
 
 void ConfigManager::save() {
@@ -53,10 +57,20 @@ void ConfigManager::save() {
     _prefs.putString(KEY_OSD2, _cfg.osd2Tpl);
     _prefs.putString(KEY_OSD3, _cfg.osd3Tpl);
     _prefs.putString(KEY_OSD4, _cfg.osd4Tpl);
+    _prefs.putString(KEY_CSSID, _cfg.caddxSsid);
+    _prefs.putString(KEY_CPASS, _cfg.caddxPass);
+}
+
+static const char *cameraTypeName(uint8_t t) {
+    switch (t) {
+        case 1:  return "GoPro";
+        case 2:  return "Caddx";
+        default: return "DJI";
+    }
 }
 
 void ConfigManager::printAll(Stream &out) {
-    out.printf("[cfg] camera_type     = %s\n", _cfg.cameraType == 1 ? "GoPro" : "DJI");
+    out.printf("[cfg] camera_type     = %s\n", cameraTypeName(_cfg.cameraType));
     out.printf("[cfg] strict_camera   = %s\n", _cfg.strictCamera ? "true" : "false");
     out.printf("[cfg] disarm_delay    = %u ms\n", _cfg.disarmStopDelayMs);
     out.printf("[cfg] stop_on_disarm  = %s\n", _cfg.stopOnDisarm ? "true" : "false");
@@ -69,6 +83,8 @@ void ConfigManager::printAll(Stream &out) {
     out.printf("[cfg] osd2            = %s\n", _cfg.osd2Tpl);
     out.printf("[cfg] osd3            = %s\n", _cfg.osd3Tpl);
     out.printf("[cfg] osd4            = %s\n", _cfg.osd4Tpl);
+    out.printf("[cfg] caddx_ssid      = %s\n", _cfg.caddxSsid);
+    out.printf("[cfg] caddx_pass      = %s\n", strlen(_cfg.caddxPass) ? "(set)" : "(not set)");
 }
 
 void ConfigManager::handleLine(const char *line, Stream &out) {
@@ -83,7 +99,7 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         out.println("Commands:");
         out.println("  version                    - print firmware version");
         out.println("  show                       - print all settings");
-        out.println("  set camera_type <0|1>      - 0=DJI, 1=GoPro (reboot required)");
+        out.println("  set camera_type <0|1|2>    - 0=DJI, 1=GoPro, 2=Caddx Orca (reboot required)");
         out.println("  set strict_camera <0|1>    - 1=only connect to preferred camera, skip unknown ones");
         out.println("  set disarm_delay <ms>      - delay before stopping recording after disarm");
         out.println("  set stop_on_disarm <0|1>   - disable (0) or enable (1) stop on disarm");
@@ -94,6 +110,8 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         out.println("  set osd3 <template>        - OSD Custom Message 3 template (default: settings)");
         out.println("  set osd4 <template>        - OSD Custom Message 4 template (default: storage)");
         out.println("  Tokens: {bat} {rec} {mode} {res} {fps} {eis} {rleft} {rcap}");
+        out.println("  set caddx_ssid <ssid>      - Wi-Fi network the Caddx Orca creates (camera_type=2)");
+        out.println("  set caddx_pass <password>  - Wi-Fi password for the above (default: 12345678, reboot required)");
         out.println("  reset                      - restore defaults");
         out.println("Camera list commands:");
         out.println("  cameras list               - list saved cameras");
@@ -124,13 +142,12 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
             const char *val = rest + 12;
             while (*val == ' ') val++;
             uint8_t t = static_cast<uint8_t>(strtoul(val, nullptr, 10));
-            if (t > 1) {
-                out.println("[cfg] camera_type must be 0 (DJI) or 1 (GoPro)");
+            if (t > 2) {
+                out.println("[cfg] camera_type must be 0 (DJI), 1 (GoPro), or 2 (Caddx)");
                 return;
             }
             setCameraType(t);
-            out.printf("[cfg] camera_type = %s (saved — reboot to apply)\n",
-                       t == 1 ? "GoPro" : "DJI");
+            out.printf("[cfg] camera_type = %s (saved — reboot to apply)\n", cameraTypeName(t));
             return;
         }
 
@@ -203,6 +220,18 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         if (strncmp(rest, "osd4 ", 5) == 0) {
             setOsdTemplate(4, rest + 5);
             out.printf("[cfg] osd4 = %s (saved)\n", _cfg.osd4Tpl);
+            return;
+        }
+
+        if (strncmp(rest, "caddx_ssid ", 11) == 0) {
+            setCaddxSsid(rest + 11);
+            out.printf("[cfg] caddx_ssid = %s (saved — reboot to apply)\n", _cfg.caddxSsid);
+            return;
+        }
+
+        if (strncmp(rest, "caddx_pass ", 11) == 0) {
+            setCaddxPass(rest + 11);
+            out.println("[cfg] caddx_pass = (set) (saved — reboot to apply)");
             return;
         }
 
@@ -337,4 +366,14 @@ void ConfigManager::setOsdTemplate(uint8_t n, const char *tpl) {
     }
     strlcpy(dst, tpl, OSD_TPL_LEN);
     _prefs.putString(key, dst);
+}
+
+void ConfigManager::setCaddxSsid(const char *ssid) {
+    strlcpy(_cfg.caddxSsid, ssid, sizeof(_cfg.caddxSsid));
+    _prefs.putString(KEY_CSSID, _cfg.caddxSsid);
+}
+
+void ConfigManager::setCaddxPass(const char *pass) {
+    strlcpy(_cfg.caddxPass, pass, sizeof(_cfg.caddxPass));
+    _prefs.putString(KEY_CPASS, _cfg.caddxPass);
 }

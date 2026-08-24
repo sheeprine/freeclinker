@@ -13,7 +13,9 @@ struct CameraEntry {
     char    name[CAMREG_NAME_LEN];  // display name seen during scan
     char    addr[CAMREG_ADDR_LEN];  // BLE address string
     uint8_t addrType;               // esp_ble_addr_type_t (0=public, 1=random)
-    uint8_t cameraType;             // 0=DJI, 1=GoPro
+    uint8_t cameraType;             // 0=DJI, 1=GoPro, 2=Caddx (unused today — Caddx
+                                     // has no BLE pairing flow, so it never populates
+                                     // this registry; kept for display consistency)
 };
 
 // Persists a list of up to 64 previously connected cameras to NVS.

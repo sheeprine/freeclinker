@@ -322,7 +322,16 @@
         <select id="cameraType" disabled>
           <option value="0">DJI Action</option>
           <option value="1">GoPro</option>
+          <option value="2">Caddx Orca</option>
         </select>
+      </div>
+
+      <!-- Caddx Wi-Fi credentials (Caddx Orca has no BLE pairing — it's a Wi-Fi CGI camera) -->
+      <div class="cfg-field" style="flex-direction:column; align-items:flex-start;">
+        <div class="cfg-field-name">Caddx Wi-Fi network</div>
+        <div class="cfg-field-desc">Only used when camera type is Caddx Orca. The camera's own Wi-Fi SSID/password (same network you'd join from the phone's Wi-Fi settings for the CaddxFPV app). <strong>Reboot required to apply.</strong></div>
+        <input class="tpl-input" id="caddxSsid" type="text" placeholder="SSID" maxlength="32" spellcheck="false" disabled>
+        <input class="tpl-input" id="caddxPass" type="text" placeholder="Password" maxlength="63" spellcheck="false" disabled>
       </div>
 
       <!-- Strict camera -->
@@ -510,6 +519,8 @@ const baudSelect    = document.getElementById('baudRate');
 const readBtn        = document.getElementById('readBtn');
 const applyBtn       = document.getElementById('applyBtn');
 const cameraTypeSel  = document.getElementById('cameraType');
+const caddxSsidInput = document.getElementById('caddxSsid');
+const caddxPassInput = document.getElementById('caddxPass');
 const stopToggle          = document.getElementById('stopOnDisarm');
 const strictCameraToggle  = document.getElementById('strictCamera');
 const delayInput     = document.getElementById('disarmDelay');
@@ -586,7 +597,9 @@ function parseConfigLine(line) {
   const val = m[2].trim().replace(/\s*\(saved.*/, '');
 
   if (key === 'camera_type') {
-    cameraTypeSel.value = val === 'GoPro' ? '1' : '0';
+    cameraTypeSel.value = val === 'GoPro' ? '1' : (val === 'Caddx' ? '2' : '0');
+  } else if (key === 'caddx_ssid') {
+    caddxSsidInput.value = val;
   } else if (key === 'disarm_delay') {
     delayInput.value = parseInt(val) || 0;
     updateDelayEquiv();
@@ -732,6 +745,14 @@ applyBtn.addEventListener('click', async () => {
   const stop   = stopToggle.checked ? 1 : 0;
   const strict = strictCameraToggle.checked ? 1 : 0;
   await sendCommand(`set camera_type ${cameraTypeSel.value}`);
+  if (caddxSsidInput.value) await sendCommand(`set caddx_ssid ${caddxSsidInput.value}`);
+  // Password is write-only (never read back from the device) — only send it
+  // if the user actually typed something, so a blank field doesn't wipe a
+  // previously saved password on every Apply click.
+  if (caddxPassInput.value) {
+    await sendCommand(`set caddx_pass ${caddxPassInput.value}`);
+    caddxPassInput.value = '';
+  }
   await sendCommand(`set strict_camera ${strict}`);
   await sendCommand(`set disarm_delay ${delay}`);
   await sendCommand(`set stop_on_disarm ${stop}`);
@@ -806,7 +827,7 @@ function parseCameraLines(lines) {
   const cameras = [];
   for (const line of lines) {
     // [reg]   N: NAME(28 padded chars)  aa:bb:cc:dd:ee:ff  DJI/GoPro  [tag]
-    const m = line.match(/^\[reg\]\s+(\d+):\s(.+?)\s{2,}([0-9a-fA-F:]{17})\s+(DJI|GoPro)(.*)/);
+    const m = line.match(/^\[reg\]\s+(\d+):\s(.+?)\s{2,}([0-9a-fA-F:]{17})\s+(DJI|GoPro|Caddx)(.*)/);
     if (m) cameras.push({
       idx:  parseInt(m[1]),
       name: m[2].trim(),
@@ -890,6 +911,8 @@ function setConnected(connected) {
   readBtn.disabled       = !connected;
   applyBtn.disabled      = !connected;
   cameraTypeSel.disabled = !connected;
+  caddxSsidInput.disabled = !connected;
+  caddxPassInput.disabled = !connected;
   stopToggle.disabled         = !connected;
   strictCameraToggle.disabled = !connected;
   delayInput.disabled    = !connected;

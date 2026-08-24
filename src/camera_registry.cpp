@@ -6,6 +6,14 @@ static constexpr const char *KEY_CNT  = "cnt";
 static constexpr const char *KEY_LAST = "last";
 static constexpr const char *KEY_LIST = "list";
 
+static const char *cameraTypeName(uint8_t t) {
+    switch (t) {
+        case 1:  return "GoPro";
+        case 2:  return "Caddx";
+        default: return "DJI";
+    }
+}
+
 void CameraRegistry::begin() {
     _prefs.begin(NVS_NS, false);
     load();
@@ -123,7 +131,7 @@ void CameraRegistry::printList(Stream &out) const {
         else if (isSel)       tag = " [selected]";
         out.printf("[reg]  %2u: %-28s %s  %s%s\n", i,
                    _entries[i].name, _entries[i].addr,
-                   _entries[i].cameraType == 1 ? "GoPro" : "DJI", tag);
+                   cameraTypeName(_entries[i].cameraType), tag);
     }
 }
 

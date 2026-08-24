@@ -1,0 +1,9 @@
+# PlatformIO build output
+.pio/
+
+# Reverse-engineering scratch material (extracted APK libs, Ghidra projects,
+# decompiled dumps) — large, not source, kept locally for reference only.
+re/
+
+# APK files (large binaries, not source)
+*.apk

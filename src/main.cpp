@@ -5,12 +5,14 @@
 #include "camera.h"
 #include "ble_camera.h"
 #include "gopro_camera.h"
+#include "caddx_camera.h"
 #include "msp_serial.h"
 #include "dji_protocol.h"
 #include "web_server.h"
 
 static BLECamera       djiCamera;
 static GoProCamera     goProCamera;
+static CaddxCamera     caddxCamera;
 static Camera         *activeCamera = nullptr;
 
 static CameraRegistry   cameraRegistry;
@@ -114,11 +116,15 @@ void setup() {
     configManager.begin(DBG_SERIAL);
     configManager.setRegistry(&cameraRegistry);
 
-    const bool useGoPro = (configManager.config().cameraType == 1);
-    activeCamera = useGoPro ? static_cast<Camera *>(&goProCamera)
-                            : static_cast<Camera *>(&djiCamera);
+    const uint8_t camType = configManager.config().cameraType;
+    const char *camTypeName;
+    switch (camType) {
+        case 1:  activeCamera = &goProCamera; camTypeName = "GoPro";      break;
+        case 2:  activeCamera = &caddxCamera; camTypeName = "Caddx Orca"; break;
+        default: activeCamera = &djiCamera;   camTypeName = "DJI Action"; break;
+    }
 
-    DBG_SERIAL.printf("[main] Camera type: %s\n", useGoPro ? "GoPro" : "DJI Action");
+    DBG_SERIAL.printf("[main] Camera type: %s\n", camTypeName);
     DBG_SERIAL.printf("[main] MSP output: TX=GPIO%d @ %u baud\n",
                       BF_TX_PIN, BF_BAUD);
     DBG_SERIAL.printf("[main] WiFi AP '%s' starts in %u s if no camera connects\n",
@@ -136,12 +142,18 @@ void setup() {
     mspSerial.setArmCallback(onArmStateChange);
     mspSerial.setAuxSwitchCallback(onAuxSwitch);
 
+    // Caddx has no BLE scan/pairing flow, so it does not use the BLE camera
+    // registry or strict-camera fallback logic — it just joins the
+    // configured Wi-Fi network directly (see caddx_camera.h).
     djiCamera.setRegistry(&cameraRegistry);
     goProCamera.setRegistry(&cameraRegistry);
 
     const bool strict = configManager.config().strictCamera;
     djiCamera.setStrictCamera(strict);
     goProCamera.setStrictCamera(strict);
+
+    caddxCamera.setWifiCredentials(configManager.config().caddxSsid,
+                                   configManager.config().caddxPass);
 
     activeCamera->setCameraCallback(onCameraData);
     activeCamera->begin();

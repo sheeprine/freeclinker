@@ -70,6 +70,7 @@ void WebConfigServer::handleGetConfig() {
     const auto &c = _cfg->config();
     JsonDocument doc;
     doc["camera_type"]    = c.cameraType;
+    doc["caddx_ssid"]     = c.caddxSsid;  // password intentionally omitted — write-only
     doc["disarm_delay"]   = c.disarmStopDelayMs;
     doc["stop_on_disarm"] = c.stopOnDisarm;
     doc["aux_channel"]    = c.auxChannel;
@@ -95,6 +96,8 @@ void WebConfigServer::handlePostConfig() {
     }
 
     if (doc["camera_type"].is<int>())     _cfg->setCameraType(doc["camera_type"].as<uint8_t>());
+    if (doc["caddx_ssid"].is<const char *>()) _cfg->setCaddxSsid(doc["caddx_ssid"].as<const char *>());
+    if (doc["caddx_pass"].is<const char *>()) _cfg->setCaddxPass(doc["caddx_pass"].as<const char *>());
     if (doc["disarm_delay"].is<int>())    _cfg->setDisarmDelay(doc["disarm_delay"].as<uint32_t>());
     if (doc["stop_on_disarm"].is<bool>()) _cfg->setStopOnDisarm(doc["stop_on_disarm"].as<bool>());
     if (doc["aux_channel"].is<int>())     _cfg->setAuxChannel(doc["aux_channel"].as<uint8_t>());
