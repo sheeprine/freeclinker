@@ -19,6 +19,14 @@
 #define GP_MANUFACTURER_ID_HI  0xF2
 #define GP_DEVICE_NAME_PREFIX  "GoPro"
 
+// Standard Bluetooth SIG Battery Service — HERO4/5-Session-era cameras report
+// battery % here instead of via status ID 70 on the FEA6 TLV channel (that
+// TLV field comes back with a zero-length value on real Session 5 hardware).
+// Best-effort: discovered separately from the FEA6 service and non-fatal if
+// missing, matching the pattern used for Sony's battery characteristic.
+#define GP_BATTERY_SERVICE_UUID   0x180F  // 16-bit, standard Battery Service
+#define GP_CHAR_BATTERY_LEVEL     0x2A19  // 16-bit, standard Battery Level (uint8 %)
+
 // ─── Command IDs (sent to GP_CHAR_CMD_WRITE, ack on GP_CHAR_CMD_NOTIFY) ──────
 
 #define GP_CMD_SET_SHUTTER       0x01
@@ -79,6 +87,27 @@
 #define GP_SETTING_RESOLUTION    2    // uint8: VIDEO_RESOLUTION value (see below)
 #define GP_SETTING_FPS           3    // uint8: FRAMES_PER_SECOND value (see below)
 #define GP_SETTING_HYPERSMOOTH   135  // uint8: 0=OFF,1=LOW,2=HIGH,3=BOOST,4=AUTO_BOOST,100=STD
+
+// ─── Legacy protocol (HERO4/5 Session era, pre-preset-group firmware) ────────
+// These cameras predate the preset-group / Open GoPro status-ID scheme above.
+// Confirmed on real HERO5 Session hardware: registering for status IDs 10/96
+// alongside the legacy IDs below is ACKed (not rejected), but the camera
+// never actually pushes values for 10/96 — recording/mode telemetry only
+// ever arrives on the legacy IDs, so both sets are requested together (see
+// sendRegisterStatus() in gopro_camera.cpp). A setting ID the camera truly
+// doesn't recognize (e.g. HyperSmooth, HERO7+) does get the whole setting
+// batch rejected outright. These cameras share the same characteristic
+// UUIDs, shutter command (0x01), and Get Hardware Info command (0x3C) as
+// modern ones, but use a plain capture-mode command instead of preset groups.
+
+#define GP_CMD_LEGACY_SET_CAPTURE_MODE 0x02  // param: 0=video,1=photo,2=multishot
+
+#define GP_CAPTURE_MODE_VIDEO      0x00
+#define GP_CAPTURE_MODE_PHOTO      0x01
+#define GP_CAPTURE_MODE_MULTISHOT  0x02
+
+#define GP_STATUS_LEGACY_RECORDING 8    // uint8: 0=stopped, 1=recording
+#define GP_STATUS_LEGACY_MODE      43   // uint8: 0=video,1=photo,2=multishot
 
 // ─── Packet framing helpers ───────────────────────────────────────────────────
 //

@@ -274,6 +274,8 @@ bool GoProCamera::connectAndSetup() {
     _bleConnected = true;
     DBG_SERIAL.println("[BLE] GoPro BLE connected — querying hardware info");
 
+    discoverBatteryService();
+
     // Record this camera in the registry so it is preferred on next boot
     if (_registry)
         _registry->onConnected(_targetName.c_str(), _targetAddr.c_str(),
@@ -284,6 +286,36 @@ bool GoProCamera::connectAndSetup() {
     return true;
 }
 
+// Standard Battery Service (0x180F) — best-effort. HERO4/5-Session-era
+// cameras report battery % here instead of via status ID 70 on the FEA6
+// TLV channel (confirmed on real Session 5 hardware: that TLV field comes
+// back with a zero-length value). A missing service/characteristic just
+// means no battery telemetry from this path, not a connection failure —
+// modern cameras that do push a value via status ID 70 are unaffected.
+void GoProCamera::discoverBatteryService() {
+    BLERemoteService *battSvc = _client->getService(BLEUUID((uint16_t)GP_BATTERY_SERVICE_UUID));
+    if (!battSvc) {
+        DBG_SERIAL.println("[BLE] Battery service 0x180F not available");
+        return;
+    }
+
+    BLERemoteCharacteristic *battCh = battSvc->getCharacteristic(BLEUUID((uint16_t)GP_CHAR_BATTERY_LEVEL));
+    if (!battCh || !battCh->canNotify()) {
+        DBG_SERIAL.println("[BLE] Battery Level char 0x2A19 not found");
+        return;
+    }
+    battCh->registerForNotify(batteryNotifyCallback);
+    DBG_SERIAL.println("[BLE] Subscribed to 0x2A19 (battery notify)");
+
+    // Read once immediately rather than waiting for the camera to push a
+    // change, so battery shows up right after connecting.
+    if (battCh->canRead()) {
+        std::string val = battCh->readValue();
+        if (!val.empty())
+            handleBatteryNotification((uint8_t *)val.data(), val.size());
+    }
+}
+
 void GoProCamera::onConnect(BLEClient * /*c*/) {
     DBG_SERIAL.println("[BLE] onConnect");
 }
@@ -292,6 +324,7 @@ void GoProCamera::onDisconnect(BLEClient * /*c*/) {
     DBG_SERIAL.println("[BLE] GoPro disconnected — will rescan");
     _gpConnected   = false;
     _bleConnected  = false;
+    _legacyProtocol = false;
     _cmdChar       = nullptr;
     _settingChar   = nullptr;
     _queryChar     = nullptr;
@@ -362,23 +395,50 @@ void GoProCamera::sendRegisterSettings() {
 void GoProCamera::sendRegisterStatus() {
     if (!_queryChar) return;
     // Register for change notifications on status IDs via 0x53.
-    const uint8_t ids[] = {
-        GP_STATUS_OVERHEATING,
-        GP_STATUS_ENCODING,
-        GP_STATUS_ENC_DURATION,
-        GP_STATUS_REMAINING_TIME,
-        GP_STATUS_SD_REMAINING,
-        GP_STATUS_BATTERY_PCT,
-        GP_STATUS_PRESET_GROUP,
-    };
-    uint8_t payload_len = 1 + (uint8_t)sizeof(ids);
     uint8_t buf[32];
-    buf[0] = payload_len & 0x1F;
-    buf[1] = GP_QUERY_REGISTER_STATUS;
-    memcpy(buf + 2, ids, sizeof(ids));
+    uint8_t payload_len;
+
+    if (_legacyProtocol) {
+        // HERO4/5-Session-era status-ID set (see gopro_protocol.h) — the
+        // union set below was rejected outright on this camera.
+        const uint8_t ids[] = {
+            GP_STATUS_LEGACY_RECORDING,
+            GP_STATUS_ENC_DURATION,
+            GP_STATUS_LEGACY_MODE,
+            GP_STATUS_BATTERY_PCT,
+        };
+        payload_len = 1 + (uint8_t)sizeof(ids);
+        buf[0] = payload_len & 0x1F;
+        buf[1] = GP_QUERY_REGISTER_STATUS;
+        memcpy(buf + 2, ids, sizeof(ids));
+    } else {
+        // Union of modern and legacy IDs. Real HERO4/5 Session hardware ACKs
+        // registration for the modern IDs (encoding=10, preset group=96) but
+        // silently never pushes values for them — recording/mode telemetry
+        // only ever arrives on the legacy IDs (8/43) on that generation.
+        // Registering both costs nothing on cameras that only implement one
+        // set; unimplemented IDs just never get pushed.
+        const uint8_t ids[] = {
+            GP_STATUS_OVERHEATING,
+            GP_STATUS_ENCODING,
+            GP_STATUS_LEGACY_RECORDING,
+            GP_STATUS_ENC_DURATION,
+            GP_STATUS_REMAINING_TIME,
+            GP_STATUS_LEGACY_MODE,
+            GP_STATUS_SD_REMAINING,
+            GP_STATUS_BATTERY_PCT,
+            GP_STATUS_PRESET_GROUP,
+        };
+        payload_len = 1 + (uint8_t)sizeof(ids);
+        buf[0] = payload_len & 0x1F;
+        buf[1] = GP_QUERY_REGISTER_STATUS;
+        memcpy(buf + 2, ids, sizeof(ids));
+    }
+
     if (_debugBle) bleDebugDump(DBG_SERIAL, "TX", "GP-0076", buf, 1 + payload_len);
     _queryChar->writeValue(buf, 1 + payload_len, false);
-    DBG_SERIAL.println("[GP] Register for status updates sent");
+    DBG_SERIAL.printf("[GP] Register for status updates sent (%s)\n",
+                       _legacyProtocol ? "legacy" : "modern");
 }
 
 // ─── Recording & mode commands ────────────────────────────────────────────────
@@ -415,6 +475,22 @@ bool GoProCamera::exitBurstSloMo() {
 }
 
 bool GoProCamera::switchCameraMode(uint8_t dji_mode) {
+    if (_legacyProtocol) {
+        // Older cameras (e.g. HERO5 Session) predate preset groups and use a
+        // plain capture-mode command instead.
+        uint8_t mode;
+        switch (dji_mode) {
+            case DJI_MODE_PHOTO:      mode = GP_CAPTURE_MODE_PHOTO;     break;
+            case DJI_MODE_TIMELAPSE:
+            case DJI_MODE_HYPERLAPSE: mode = GP_CAPTURE_MODE_MULTISHOT; break;
+            default:                  mode = GP_CAPTURE_MODE_VIDEO;    break;  // VIDEO + others
+        }
+        const uint8_t p[] = {0x01, mode};
+        sendCmd(GP_CMD_LEGACY_SET_CAPTURE_MODE, p, sizeof(p));
+        DBG_SERIAL.printf("[GP] Legacy capture mode %u sent\n", mode);
+        return true;
+    }
+
     // Map DJI_MODE_* → GoPro preset group
     uint8_t group;
     switch (dji_mode) {
@@ -444,6 +520,11 @@ void GoProCamera::settingNotifyCallback(BLERemoteCharacteristic * /*ch*/,
 void GoProCamera::queryNotifyCallback(BLERemoteCharacteristic * /*ch*/,
                                        uint8_t *data, size_t len, bool /*isNotify*/) {
     if (_instance) _instance->handleQueryNotification(data, len);
+}
+
+void GoProCamera::batteryNotifyCallback(BLERemoteCharacteristic * /*ch*/,
+                                         uint8_t *data, size_t len, bool /*isNotify*/) {
+    if (_instance) _instance->handleBatteryNotification(data, len);
 }
 
 // ─── Notification handling ────────────────────────────────────────────────────
@@ -490,6 +571,11 @@ void GoProCamera::handleCmdMessage(const uint8_t *msg, size_t len) {
             DBG_SERIAL.println("[GP] Preset group OK");
         else
             DBG_SERIAL.printf("[GP] Preset group rejected: 0x%02X\n", status);
+    } else if (cmd_id == GP_CMD_LEGACY_SET_CAPTURE_MODE) {
+        if (status == 0)
+            DBG_SERIAL.println("[GP] Legacy capture mode OK");
+        else
+            DBG_SERIAL.printf("[GP] Legacy capture mode rejected: 0x%02X\n", status);
     }
 }
 
@@ -505,8 +591,11 @@ void GoProCamera::handleSettingMessage(const uint8_t *msg, size_t len) {
 }
 
 // Assembled query response: [query_id, status, id, len, val..., ...]
-// Assembled pushed notification (0x92/0x93): [notify_id, id, len, val..., ...]
-// (no status byte — it's unsolicited, not a response to a request).
+// Assembled pushed notification (0x92/0x93): [notify_id, status, id, len, val..., ...]
+// (pushed notifications carry the same leading status byte as query
+// responses, confirmed against real HERO5 Session traffic — a push right
+// after a shutter-on command decodes cleanly as [93, 00, 08, 01, 01, ...]
+// only when the status byte is skipped too).
 void GoProCamera::handleQueryMessage(const uint8_t *msg, size_t len) {
     if (len < 1) return;
     uint8_t query_id = msg[0];
@@ -514,8 +603,27 @@ void GoProCamera::handleQueryMessage(const uint8_t *msg, size_t len) {
     if (query_id == GP_QUERY_REGISTER_SETTING || query_id == GP_QUERY_REGISTER_STATUS) {
         if (len < 2) return;
         uint8_t status = msg[1];
+
         if (status != 0) {
-            DBG_SERIAL.printf("[GP] Query 0x%02X failed: status=0x%02X\n", query_id, status);
+            if (query_id == GP_QUERY_REGISTER_SETTING) {
+                // Older cameras (e.g. HERO5 Session) reject the whole batch if
+                // any queried setting ID is unsupported (HyperSmooth is
+                // HERO7+). Extended setting telemetry is optional — skip it
+                // and proceed straight to status registration.
+                DBG_SERIAL.println("[GP] Setting registration rejected — skipping extended telemetry");
+                _pendingRegisterStatus = true;
+            } else if (!_legacyProtocol) {
+                // Modern status-ID set (encoding=10, preset group=96, ...)
+                // rejected — retry once with the legacy HERO4/5-Session-era set.
+                DBG_SERIAL.println("[GP] Status registration rejected — retrying with legacy status IDs");
+                _legacyProtocol        = true;
+                _pendingRegisterStatus = true;
+            } else if (!_gpConnected) {
+                // Legacy set rejected too — give up on telemetry, but still
+                // let the bridge issue record/mode commands.
+                DBG_SERIAL.println("[GP] Legacy status registration also rejected — continuing without telemetry");
+                _gpConnected = true;
+            }
             return;
         }
 
@@ -533,8 +641,8 @@ void GoProCamera::handleQueryMessage(const uint8_t *msg, size_t len) {
                 _cameraCb(_camera);
         }
     } else if (query_id == GP_NOTIFY_SETTING_UPDATE || query_id == GP_NOTIFY_STATUS_UPDATE) {
-        if (len > 1) {
-            parseStatusTlv(msg + 1, len - 1);
+        if (len > 2) {
+            parseStatusTlv(msg + 2, len - 2);
             if (_camera.valid && _gpConnected && _cameraCb)
                 _cameraCb(_camera);
         }
@@ -587,7 +695,14 @@ void GoProCamera::parseStatusTlv(const uint8_t *tlv, size_t len) {
             break;
 
         case GP_STATUS_SD_REMAINING:
-            if (vlen >= 4) {
+            // Modern cameras: uint32 MB. HERO4/5-Session-era: uint64 KB —
+            // observed on real Session 5 hardware under this same status ID.
+            if (vlen >= 8) {
+                uint64_t kb = 0;
+                for (uint8_t i = 0; i < 8; i++) kb = (kb << 8) | v[i];
+                _camera.remain_cap_mb = (uint32_t)(kb / 1024);
+                updated = true;
+            } else if (vlen >= 4) {
                 _camera.remain_cap_mb = ((uint32_t)v[0] << 24) | ((uint32_t)v[1] << 16) |
                                         ((uint32_t)v[2] <<  8) |  (uint32_t)v[3];
                 updated = true;
@@ -604,6 +719,22 @@ void GoProCamera::parseStatusTlv(const uint8_t *tlv, size_t len) {
                     case 1:  _camera.camera_mode = DJI_MODE_PHOTO;     break;
                     case 2:  _camera.camera_mode = DJI_MODE_TIMELAPSE; break;
                     default: _camera.camera_mode = DJI_MODE_VIDEO;     break;
+                }
+                updated = true;
+            }
+            break;
+
+        // ── Legacy status IDs (HERO4/5-Session era) ─────────────────────────────
+        case GP_STATUS_LEGACY_RECORDING:
+            if (vlen >= 1) { _camera.recording = (v[0] != 0); updated = true; }
+            break;
+
+        case GP_STATUS_LEGACY_MODE:
+            if (vlen >= 1) {
+                switch (v[0]) {
+                    case GP_CAPTURE_MODE_PHOTO:
+                    case GP_CAPTURE_MODE_MULTISHOT: _camera.camera_mode = DJI_MODE_PHOTO; break;
+                    default:                        _camera.camera_mode = DJI_MODE_VIDEO; break;
                 }
                 updated = true;
             }
@@ -676,4 +807,17 @@ void GoProCamera::parseStatusTlv(const uint8_t *tlv, size_t len) {
 
     if (updated)
         _camera.valid = true;
+}
+
+// Standard Battery Level (0x2A19) notify/read payload: a single uint8, 0-100%.
+void GoProCamera::handleBatteryNotification(uint8_t *data, size_t len) {
+    if (_debugBle) bleDebugDump(DBG_SERIAL, "RX", "0x2A19", data, len);
+    if (len < 1) return;
+
+    _camera.percent = data[0];
+    _camera.valid   = true;
+    DBG_SERIAL.printf("[GP] Battery: %u%%\n", _camera.percent);
+
+    if (_gpConnected && _cameraCb)
+        _cameraCb(_camera);
 }

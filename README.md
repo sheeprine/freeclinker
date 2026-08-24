@@ -139,7 +139,9 @@ Any DJI Action camera that advertises BLE manufacturer ID `0x08AA` with marker b
 
 ### GoPro (Open GoPro BLE API)
 
-Any GoPro camera supporting the [Open GoPro BLE API](https://gopro.github.io/OpenGoPro/docs/ble/) (HERO 9 and later). Identified by advertised service UUID `0xFEA6`. Uses standard TLV-encoded commands and registers for push notifications on status changes.
+Any GoPro camera supporting the [Open GoPro BLE API](https://gopro.github.io/OpenGoPro/docs/ble/) (HERO 9 and later), identified by advertised service UUID `0xFEA6`. Uses standard TLV-encoded commands and registers for push notifications on status changes.
+
+Older cameras that predate the preset-group scheme (HERO4/5 Session) are also supported: recording, mode switching, and telemetry fall back to that generation's status IDs and capture-mode command automatically, no configuration needed.
 
 To use a GoPro, connect via serial and run:
 
