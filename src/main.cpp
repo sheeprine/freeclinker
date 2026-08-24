@@ -6,6 +6,7 @@
 #include "ble_camera.h"
 #include "gopro_camera.h"
 #include "caddx_camera.h"
+#include "sony_camera.h"
 #include "msp_serial.h"
 #include "dji_protocol.h"
 #include "web_server.h"
@@ -13,6 +14,7 @@
 static BLECamera       djiCamera;
 static GoProCamera     goProCamera;
 static CaddxCamera     caddxCamera;
+static SonyCamera      sonyCamera;
 static Camera         *activeCamera = nullptr;
 
 static CameraRegistry   cameraRegistry;
@@ -121,6 +123,7 @@ void setup() {
     switch (camType) {
         case 1:  activeCamera = &goProCamera; camTypeName = "GoPro";      break;
         case 2:  activeCamera = &caddxCamera; camTypeName = "Caddx Orca"; break;
+        case 3:  activeCamera = &sonyCamera;  camTypeName = "Sony Alpha"; break;
         default: activeCamera = &djiCamera;   camTypeName = "DJI Action"; break;
     }
 
@@ -149,14 +152,17 @@ void setup() {
     djiCamera.setRegistry(&cameraRegistry);
     goProCamera.setRegistry(&cameraRegistry);
     caddxCamera.setRegistry(&cameraRegistry);
+    sonyCamera.setRegistry(&cameraRegistry);
 
     const bool strict = configManager.config().strictCamera;
     djiCamera.setStrictCamera(strict);
     goProCamera.setStrictCamera(strict);
+    sonyCamera.setStrictCamera(strict);
 
     const bool debugBle = configManager.config().debugBle;
     djiCamera.setDebugBle(debugBle);
     goProCamera.setDebugBle(debugBle);
+    sonyCamera.setDebugBle(debugBle);
 
     activeCamera->setCameraCallback(onCameraData);
     configManager.setCamera(activeCamera, &currentCamera);
