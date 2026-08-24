@@ -17,8 +17,10 @@
 // 2. Connect; discover service FEA6; subscribe to GP-0073 and GP-0077 notify chars
 // 3. Send Get Hardware Info (GP-0072) — polls until camera BLE stack is ready
 // 4. Receive hardware info response (GP-0073, cmd_id=0x3C, status=0) → ready
-// 5. Send register-for-status-updates query (GP-0076) for battery, encoding, etc.
-// 6. Receive status change notifications (GP-0077) at 2 Hz or on change
+// 5. Send register-for-setting-updates query (GP-0076, 0x52) for resolution/fps/EIS
+// 6. On 0x52 ack, send register-for-status-updates query (GP-0076, 0x53) for
+//    battery, encoding, etc. — camera is considered ready once 0x53 succeeds
+// 7. Receive pushed setting/status updates (GP-0077, 0x92/0x93) at 2 Hz or on change
 class GoProCamera : public Camera,
                     public BLEAdvertisedDeviceCallbacks,
                     public BLEClientCallbacks {
@@ -49,7 +51,8 @@ private:
     void sendCmd(uint8_t cmd_id, const uint8_t *params, uint8_t param_len);
     void sendSetting(uint8_t setting_id, uint8_t value);
     void sendHardwareInfoQuery();
-    void sendRegisterQuery();
+    void sendRegisterSettings();
+    void sendRegisterStatus();
 
     // ── Notification handling ─────────────────────────────────────────────────
     void handleCmdNotification(uint8_t *data, size_t len);
@@ -89,8 +92,9 @@ private:
     esp_ble_addr_type_t      _candidateType = BLE_ADDR_TYPE_PUBLIC;
 
     // Deferred actions (set from notify callbacks, executed in update())
-    bool _pendingHwInfo  = false;  // retry Get Hardware Info
-    bool _pendingRegister = false; // send register query after hw info OK
+    bool _pendingHwInfo         = false;  // retry Get Hardware Info
+    bool _pendingRegisterSettings = false; // send setting registration after hw info OK
+    bool _pendingRegisterStatus   = false; // send status registration after setting reg OK
 
     // Packet reassemblers for each notify characteristic
     GpRxAssembler _cmdRx;

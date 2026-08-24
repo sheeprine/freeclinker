@@ -3,6 +3,7 @@
 #include "config.h"
 #include "ble_debug.h"
 #include "dji_protocol.h"  // for DJI_MODE_* constants used in mode mapping
+#include <BLESecurity.h>
 #include <cstring>
 
 GoProCamera *GoProCamera::_instance = nullptr;
@@ -14,6 +15,18 @@ void GoProCamera::begin() {
     BLEDevice::init("ESP32-GP-Bridge");
     BLEDevice::setPower(ESP_PWR_LVL_P9);
     BLEDevice::setMTU(500);
+
+    // MAX2 rejects Open GoPro commands on an unsecured link; request Secure
+    // Connections + bonding with no-input/no-output pairing and let the BLE
+    // stack negotiate encryption as part of the GATT connection.
+    BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT);
+    static BLESecurity security;
+    security.setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);
+    security.setCapability(ESP_IO_CAP_NONE);
+    security.setKeySize(16);
+    security.setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+    security.setRespEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+
     startScan();
 }
 
@@ -26,9 +39,15 @@ void GoProCamera::update() {
         return;
     }
 
-    if (_pendingRegister && _bleConnected) {
-        _pendingRegister = false;
-        sendRegisterQuery();
+    if (_pendingRegisterSettings && _bleConnected) {
+        _pendingRegisterSettings = false;
+        sendRegisterSettings();
+        return;
+    }
+
+    if (_pendingRegisterStatus && _bleConnected) {
+        _pendingRegisterStatus = false;
+        sendRegisterStatus();
         return;
     }
 
@@ -104,8 +123,8 @@ void GoProCamera::onResult(BLEAdvertisedDevice device) {
     if (!isGoPro && device.haveManufacturerData()) {
         const std::string mfr = device.getManufacturerData();
         if (mfr.size() >= 2 &&
-            (uint8_t)mfr[0] == GP_MANUFACTURER_ID_LO &&
-            (uint8_t)mfr[1] == GP_MANUFACTURER_ID_HI) {
+            (uint8_t)mfr[0] == GP_MANUFACTURER_ID_HI &&
+            (uint8_t)mfr[1] == GP_MANUFACTURER_ID_LO) {
             isGoPro = true;
         }
     }
@@ -322,13 +341,28 @@ void GoProCamera::sendHardwareInfoQuery() {
     DBG_SERIAL.println("[GP] Get hardware info sent");
 }
 
-void GoProCamera::sendRegisterQuery() {
+void GoProCamera::sendRegisterSettings() {
     if (!_queryChar) return;
-    // Register for change notifications on status IDs and setting IDs.
-    // Both share the same 0x52 registration command on GP-0076.
-    // Setting IDs 2, 3, 135 do not collide with any of the status IDs below.
+    // Register for change notifications on setting IDs via 0x52.
     const uint8_t ids[] = {
-        // Status IDs
+        GP_SETTING_RESOLUTION,
+        GP_SETTING_FPS,
+        GP_SETTING_HYPERSMOOTH,
+    };
+    uint8_t payload_len = 1 + (uint8_t)sizeof(ids);
+    uint8_t buf[32];
+    buf[0] = payload_len & 0x1F;
+    buf[1] = GP_QUERY_REGISTER_SETTING;
+    memcpy(buf + 2, ids, sizeof(ids));
+    if (_debugBle) bleDebugDump(DBG_SERIAL, "TX", "GP-0076", buf, 1 + payload_len);
+    _queryChar->writeValue(buf, 1 + payload_len, false);
+    DBG_SERIAL.println("[GP] Register for setting updates sent");
+}
+
+void GoProCamera::sendRegisterStatus() {
+    if (!_queryChar) return;
+    // Register for change notifications on status IDs via 0x53.
+    const uint8_t ids[] = {
         GP_STATUS_OVERHEATING,
         GP_STATUS_ENCODING,
         GP_STATUS_ENC_DURATION,
@@ -336,10 +370,6 @@ void GoProCamera::sendRegisterQuery() {
         GP_STATUS_SD_REMAINING,
         GP_STATUS_BATTERY_PCT,
         GP_STATUS_PRESET_GROUP,
-        // Setting IDs
-        GP_SETTING_RESOLUTION,
-        GP_SETTING_FPS,
-        GP_SETTING_HYPERSMOOTH,
     };
     uint8_t payload_len = 1 + (uint8_t)sizeof(ids);
     uint8_t buf[32];
@@ -348,7 +378,7 @@ void GoProCamera::sendRegisterQuery() {
     memcpy(buf + 2, ids, sizeof(ids));
     if (_debugBle) bleDebugDump(DBG_SERIAL, "TX", "GP-0076", buf, 1 + payload_len);
     _queryChar->writeValue(buf, 1 + payload_len, false);
-    DBG_SERIAL.println("[GP] Register for status + setting updates sent");
+    DBG_SERIAL.println("[GP] Register for status updates sent");
 }
 
 // ─── Recording & mode commands ────────────────────────────────────────────────
@@ -444,8 +474,8 @@ void GoProCamera::handleCmdMessage(const uint8_t *msg, size_t len) {
 
     if (cmd_id == GP_CMD_GET_HARDWARE_INFO) {
         if (status == 0) {
-            DBG_SERIAL.println("[GP] Hardware info OK — registering for status updates");
-            _pendingRegister = true;   // deferred write to avoid callback crash
+            DBG_SERIAL.println("[GP] Hardware info OK — registering for setting updates");
+            _pendingRegisterSettings = true;   // deferred write to avoid callback crash
         } else {
             DBG_SERIAL.printf("[GP] Hardware info failed (status=0x%02X) — retrying\n", status);
             _pendingHwInfo = true;
@@ -474,29 +504,42 @@ void GoProCamera::handleSettingMessage(const uint8_t *msg, size_t len) {
         DBG_SERIAL.printf("[GP] Setting %u rejected: 0x%02X\n", setting_id, status);
 }
 
-// Assembled query response / status notification:
-// [query_id, status, id, len, val..., id, len, val..., ...]
+// Assembled query response: [query_id, status, id, len, val..., ...]
+// Assembled pushed notification (0x92/0x93): [notify_id, id, len, val..., ...]
+// (no status byte — it's unsolicited, not a response to a request).
 void GoProCamera::handleQueryMessage(const uint8_t *msg, size_t len) {
-    if (len < 2) return;
+    if (len < 1) return;
     uint8_t query_id = msg[0];
-    uint8_t status   = msg[1];
 
-    if (status != 0) {
-        DBG_SERIAL.printf("[GP] Query 0x%02X failed: status=0x%02X\n", query_id, status);
-        return;
-    }
+    if (query_id == GP_QUERY_REGISTER_SETTING || query_id == GP_QUERY_REGISTER_STATUS) {
+        if (len < 2) return;
+        uint8_t status = msg[1];
+        if (status != 0) {
+            DBG_SERIAL.printf("[GP] Query 0x%02X failed: status=0x%02X\n", query_id, status);
+            return;
+        }
 
-    // On successful register response, mark as fully connected
-    if (query_id == GP_QUERY_REGISTER_STATUS && !_gpConnected) {
-        _gpConnected = true;
-        DBG_SERIAL.println("[GP] Status registration OK — camera ready");
-    }
+        if (query_id == GP_QUERY_REGISTER_SETTING) {
+            DBG_SERIAL.println("[GP] Setting registration OK — registering for status updates");
+            _pendingRegisterStatus = true;
+        } else if (!_gpConnected) {
+            _gpConnected = true;
+            DBG_SERIAL.println("[GP] Status registration OK — camera ready");
+        }
 
-    // Parse TLV triplets and update camera data
-    if (len > 2) {
-        parseStatusTlv(msg + 2, len - 2);
-        if (_camera.valid && _gpConnected && _cameraCb)
-            _cameraCb(_camera);
+        if (len > 2) {
+            parseStatusTlv(msg + 2, len - 2);
+            if (_camera.valid && _gpConnected && _cameraCb)
+                _cameraCb(_camera);
+        }
+    } else if (query_id == GP_NOTIFY_SETTING_UPDATE || query_id == GP_NOTIFY_STATUS_UPDATE) {
+        if (len > 1) {
+            parseStatusTlv(msg + 1, len - 1);
+            if (_camera.valid && _gpConnected && _cameraCb)
+                _cameraCb(_camera);
+        }
+    } else {
+        DBG_SERIAL.printf("[GP] Unhandled query/notify id 0x%02X\n", query_id);
     }
 }
 

@@ -53,9 +53,13 @@
 
 // ─── Query IDs (sent to GP_CHAR_QUERY_WRITE, response on GP_CHAR_QUERY_NOTIFY) ─
 
-#define GP_QUERY_GET_STATUS        0x12  // one-shot status read
-#define GP_QUERY_REGISTER_STATUS   0x52  // register for change notifications
-#define GP_QUERY_UNREGISTER_STATUS 0x72
+#define GP_QUERY_GET_STATUS           0x12  // one-shot status read
+#define GP_QUERY_REGISTER_SETTING     0x52  // register for setting value updates
+#define GP_QUERY_REGISTER_STATUS      0x53  // register for status value updates
+#define GP_QUERY_UNREGISTER_SETTING   0x72
+#define GP_QUERY_UNREGISTER_STATUS    0x73
+#define GP_NOTIFY_SETTING_UPDATE      0x92  // pushed setting update notification
+#define GP_NOTIFY_STATUS_UPDATE       0x93  // pushed status update notification
 
 // ─── Status IDs ───────────────────────────────────────────────────────────────
 
@@ -68,8 +72,9 @@
 #define GP_STATUS_PRESET_GROUP   96   // uint8: 0=video, 1=photo, 2=timelapse
 
 // ─── Setting IDs (queried via GP-0076, same channel as statuses) ──────────────
-// These are registered with 0x52 alongside status IDs; no numeric overlap with
-// the status IDs above, so they can be demultiplexed by ID in the TLV parser.
+// These are registered separately from the status IDs above (0x52 vs 0x53),
+// but share no numeric overlap with them, so both can be demultiplexed by ID
+// in the same TLV parser regardless of which registration produced them.
 
 #define GP_SETTING_RESOLUTION    2    // uint8: VIDEO_RESOLUTION value (see below)
 #define GP_SETTING_FPS           3    // uint8: FRAMES_PER_SECOND value (see below)
