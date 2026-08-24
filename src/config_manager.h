@@ -5,6 +5,8 @@
 #include <stdint.h>
 
 class CameraRegistry;  // forward declaration
+class Camera;           // forward declaration
+struct CameraData;      // forward declaration
 
 class ConfigManager {
 public:
@@ -49,6 +51,9 @@ public:
     void begin(Stream &serial);
     void update();
     void setRegistry(CameraRegistry *reg) { _registry = reg; }
+    // `data` must outlive the ConfigManager — main.cpp passes the address of
+    // its file-scope CameraData, refreshed on every camera callback.
+    void setCamera(Camera *cam, const CameraData *data) { _camera = cam; _cameraData = data; }
 
     const Config &config() const { return _cfg; }
 
@@ -75,10 +80,12 @@ private:
     void handleCamerasCmd(const char *sub, Stream &out);
     void handleWifiCmd(const char *sub, Stream &out);
 
-    Preferences     _prefs;
-    Config          _cfg{};
-    CameraRegistry *_registry = nullptr;
-    Stream         *_serial   = nullptr;
+    Preferences       _prefs;
+    Config            _cfg{};
+    CameraRegistry   *_registry   = nullptr;
+    Camera           *_camera     = nullptr;
+    const CameraData *_cameraData = nullptr;
+    Stream           *_serial     = nullptr;
     char            _buf[80];
     uint8_t         _len = 0;
 };

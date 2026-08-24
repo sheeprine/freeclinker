@@ -160,6 +160,7 @@ void setup() {
                                    configManager.config().caddxPass);
 
     activeCamera->setCameraCallback(onCameraData);
+    configManager.setCamera(activeCamera, &currentCamera);
     activeCamera->begin();
 
     wifiDelayOriginMs = millis();

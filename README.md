@@ -83,6 +83,15 @@ Runtime settings are changed via the USB serial console and persisted across reb
 
 OSD template tokens: `{bat}` battery %, `{rec}` recording state, `{mode}` camera mode, `{res}` resolution, `{fps}` frame rate, `{eis}` stabilisation, `{rleft}` SD time remaining, `{rcap}` SD space remaining.
 
+Action commands:
+
+| Command | Description |
+|---------|-------------|
+| `status` | Report firmware version, uptime, free heap, WiFi AP state, and camera type/connection/telemetry |
+| `record start` | Start camera recording immediately, independent of FC arm state |
+| `record stop` | Stop camera recording immediately, independent of FC arm state |
+| `reboot` | Restart the ESP32 |
+
 Type `help` in the serial console to list all commands, `show` to print current settings.
 
 ## Web interface

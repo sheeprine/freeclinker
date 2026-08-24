@@ -1,5 +1,6 @@
 #include "config_manager.h"
 #include "camera_registry.h"
+#include "camera.h"
 #include "config.h"
 #include <WiFi.h>
 #include <cstring>
@@ -119,6 +120,10 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         out.println("  set caddx_ssid <ssid>      - Wi-Fi network the Caddx Orca creates (camera_type=2)");
         out.println("  set caddx_pass <password>  - Wi-Fi password for the above (default: 12345678, reboot required)");
         out.println("  reset                      - restore defaults");
+        out.println("  reboot                     - restart the ESP32");
+        out.println("  status                     - report ESP32 and camera status");
+        out.println("  record start               - start camera recording now");
+        out.println("  record stop                - stop camera recording now");
         out.println("Camera list commands:");
         out.println("  cameras list               - list saved cameras");
         out.println("  cameras connect <idx>      - select camera for next connection");
@@ -138,6 +143,58 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         load();
         out.println("[cfg] Reset to defaults");
         printAll(out);
+        return;
+    }
+
+    if (strcmp(line, "reboot") == 0) {
+        out.println("[cfg] Rebooting...");
+        out.flush();
+        delay(100);  // let the message go out before the reset lands
+        ESP.restart();
+        return;
+    }
+
+    if (strcmp(line, "status") == 0) {
+        const uint32_t upSec = millis() / 1000;
+        out.printf("[status] FreeCLinker v%s  uptime=%02u:%02u:%02u  heap=%uB\n",
+                   FIRMWARE_VERSION,
+                   upSec / 3600, (upSec / 60) % 60, upSec % 60,
+                   (unsigned)ESP.getFreeHeap());
+
+        if ((WiFi.getMode() & WIFI_MODE_AP) != 0) {
+            out.printf("[status] wifi_ap=running  ssid=%s  ip=%s\n",
+                       WIFI_AP_SSID, WiFi.softAPIP().toString().c_str());
+        } else {
+            out.println("[status] wifi_ap=stopped");
+        }
+
+        if (!_camera) {
+            out.println("[status] camera=unavailable");
+            return;
+        }
+        out.printf("[status] camera_type=%s  connected=%s\n",
+                   cameraTypeName(_cfg.cameraType), _camera->isConnected() ? "yes" : "no");
+        if (_camera->isConnected() && _cameraData && _cameraData->valid) {
+            const CameraData &d = *_cameraData;
+            out.printf("[status]   battery=%u%%  recording=%s", d.percent, d.recording ? "yes" : "no");
+            if (d.recording) out.printf(" (%us)", d.record_time);
+            out.println();
+            out.printf("[status]   mode=0x%02X  res=%u  fps=%u  eis=%u  temp_over=%u\n",
+                       d.camera_mode, d.resolution, d.fps_idx, d.eis_mode, d.temp_over);
+            out.printf("[status]   remain_time=%lus  remain_cap=%luMB\n",
+                       (unsigned long)d.remain_time, (unsigned long)d.remain_cap_mb);
+        }
+        return;
+    }
+
+    if (strcmp(line, "record start") == 0 || strcmp(line, "record stop") == 0) {
+        if (!_camera) {
+            out.println("[status] camera=unavailable");
+            return;
+        }
+        const bool start = (strcmp(line, "record start") == 0);
+        const bool ok = start ? _camera->startRecording() : _camera->stopRecording();
+        out.printf("[status] record %s: %s\n", start ? "start" : "stop", ok ? "ok" : "failed");
         return;
     }
 
