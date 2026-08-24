@@ -25,9 +25,12 @@ public:
     void setCameraCallback(CameraCallback cb) { _cameraCb = cb; }
     void setRegistry(CameraRegistry *reg)     { _registry = reg; }
     void setStrictCamera(bool v)              { _strictCamera = v; }
+    // When true, implementations log raw BLE TX/RX packets to DBG_SERIAL.
+    void setDebugBle(bool v)                  { _debugBle = v; }
 
 protected:
     CameraCallback  _cameraCb     = nullptr;
     CameraRegistry *_registry     = nullptr;
     bool            _strictCamera = false;  // when true, skip fallback to first-found camera
+    bool            _debugBle     = false;  // when true, log raw BLE packets
 };

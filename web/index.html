@@ -374,6 +374,18 @@
         </label>
       </div>
 
+      <!-- Debug BLE -->
+      <div class="cfg-field">
+        <div class="cfg-field-text">
+          <div class="cfg-field-name">BLE debug logging</div>
+          <div class="cfg-field-desc">Log raw BLE TX/RX packets to the serial console (DJI/GoPro only). Verbose — leave off unless debugging.</div>
+        </div>
+        <label class="switch" title="BLE debug logging">
+          <input type="checkbox" id="debugBle" disabled>
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+
       <!-- Disarm delay -->
       <div class="cfg-field" style="flex-direction:column; align-items:flex-start;">
         <div class="cfg-field-name">Disarm delay</div>
@@ -542,6 +554,7 @@ const caddxScanBtn      = document.getElementById('caddxScanBtn');
 const caddxScanResults  = document.getElementById('caddxScanResults');
 const stopToggle          = document.getElementById('stopOnDisarm');
 const strictCameraToggle  = document.getElementById('strictCamera');
+const debugBleToggle      = document.getElementById('debugBle');
 const delayInput     = document.getElementById('disarmDelay');
 const delayEquiv     = document.getElementById('delayEquiv');
 const savedMsg       = document.getElementById('savedMsg');
@@ -639,6 +652,8 @@ function parseConfigLine(line) {
     auxModeSel.value = parseInt(val).toString();
   } else if (key === 'strict_camera') {
     strictCameraToggle.checked = (val === 'true');
+  } else if (key === 'debug_ble') {
+    debugBleToggle.checked = (val === 'true');
   } else if (key === 'osd1') { osd1Input.value = val;
   } else if (key === 'osd2') { osd2Input.value = val;
   } else if (key === 'osd3') { osd3Input.value = val;
@@ -774,7 +789,9 @@ applyBtn.addEventListener('click', async () => {
     await sendCommand(`set caddx_pass ${caddxPassInput.value}`);
     caddxPassInput.value = '';
   }
+  const debugBle = debugBleToggle.checked ? 1 : 0;
   await sendCommand(`set strict_camera ${strict}`);
+  await sendCommand(`set debug_ble ${debugBle}`);
   await sendCommand(`set disarm_delay ${delay}`);
   await sendCommand(`set stop_on_disarm ${stop}`);
   flashSaved(savedMsg);
@@ -1024,6 +1041,7 @@ function setConnected(connected) {
   caddxScanBtn.disabled   = !connected;
   stopToggle.disabled         = !connected;
   strictCameraToggle.disabled = !connected;
+  debugBleToggle.disabled     = !connected;
   delayInput.disabled    = !connected;
   auxChannelSel.disabled = !connected;
   auxApplyBtn.disabled   = !connected;

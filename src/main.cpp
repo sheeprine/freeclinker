@@ -152,6 +152,10 @@ void setup() {
     djiCamera.setStrictCamera(strict);
     goProCamera.setStrictCamera(strict);
 
+    const bool debugBle = configManager.config().debugBle;
+    djiCamera.setDebugBle(debugBle);
+    goProCamera.setDebugBle(debugBle);
+
     caddxCamera.setWifiCredentials(configManager.config().caddxSsid,
                                    configManager.config().caddxPass);
 
@@ -164,6 +168,7 @@ void setup() {
 void loop() {
     configManager.update();
     mspSerial.setAuxChannel(configManager.config().auxChannel);
+    activeCamera->setDebugBle(configManager.config().debugBle);
     activeCamera->update();
     mspSerial.update();
 

@@ -18,6 +18,7 @@ public:
         uint8_t  auxMode;            // camera mode when AUX is high (0x00=slow motion)
         uint8_t  cameraType;         // 0=DJI, 1=GoPro, 2=Caddx
         bool     strictCamera;       // true = never connect to a camera other than the preferred one
+        bool     debugBle;           // true = log raw BLE TX/RX packets to the serial console
         // OSD custom message templates — tokens: {bat} {rec} {mode} {res} {fps} {eis} {rleft} {rcap}
         char osd1Tpl[OSD_TPL_LEN];  // Custom Message 1 (default: battery)
         char osd2Tpl[OSD_TPL_LEN];  // Custom Message 2 (default: recording state)
@@ -35,6 +36,7 @@ public:
     static constexpr uint8_t  DEFAULT_AUX_MODE             = 0x00;  // slow motion
     static constexpr uint8_t  DEFAULT_CAMERA_TYPE          = 0;     // DJI
     static constexpr bool     DEFAULT_STRICT_CAMERA        = false;
+    static constexpr bool     DEFAULT_DEBUG_BLE            = false;
     static constexpr const char *DEFAULT_OSD1_TPL = "CAM:{bat}";
     static constexpr const char *DEFAULT_OSD2_TPL = "{rec}";
     static constexpr const char *DEFAULT_OSD3_TPL = "{mode} {res}/{fps} {eis}";
@@ -60,6 +62,7 @@ public:
     void setAuxChannel(uint8_t ch);
     void setAuxMode(uint8_t mode);
     void setStrictCamera(bool v);
+    void setDebugBle(bool v);
     void setOsdTemplate(uint8_t n, const char *tpl);  // n = 1..4
     void setCaddxSsid(const char *ssid);
     void setCaddxPass(const char *pass);

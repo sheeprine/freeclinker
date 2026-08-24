@@ -1,6 +1,7 @@
 #include "ble_camera.h"
 #include "camera_registry.h"
 #include "config.h"
+#include "ble_debug.h"
 #include <cstring>
 
 BLECamera *BLECamera::_instance = nullptr;
@@ -283,6 +284,7 @@ bool BLECamera::sendFrame(uint8_t cmd_set, uint8_t cmd_id, uint8_t cmd_type,
     uint16_t n = dji_build_frame(buf, sizeof(buf), cmd_set, cmd_id, cmd_type,
                                   seq, payload, len);
     if (n == 0) return false;
+    if (_debugBle) bleDebugDump(DBG_SERIAL, "TX", "0xFFF5", buf, n);
     _writeChar->writeValue(buf, n, with_rsp);
     return true;
 }
@@ -373,13 +375,7 @@ void BLECamera::notifyCallback(BLERemoteCharacteristic * /*ch*/,
 void BLECamera::handleNotification(uint8_t *data, size_t length) {
     if (length == 0) return;
 
-#if DEBUG_PRINT_SERVICES
-    DBG_SERIAL.printf("[BLE] Notify %u bytes:", length);
-    for (size_t i = 0; i < length && i < 24; i++)
-        DBG_SERIAL.printf(" %02X", data[i]);
-    if (length > 24) DBG_SERIAL.print(" …");
-    DBG_SERIAL.println();
-#endif
+    if (_debugBle) bleDebugDump(DBG_SERIAL, "RX", "0xFFF4", data, length);
 
     // 0x55-prefixed telemetry stream and anything else that isn't a DJI frame — ignore.
     if (data[0] != DJI_SOF) return;

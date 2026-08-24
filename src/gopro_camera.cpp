@@ -1,6 +1,7 @@
 #include "gopro_camera.h"
 #include "camera_registry.h"
 #include "config.h"
+#include "ble_debug.h"
 #include "dji_protocol.h"  // for DJI_MODE_* constants used in mode mapping
 #include <cstring>
 
@@ -293,6 +294,7 @@ void GoProCamera::onDisconnect(BLEClient * /*c*/) {
 void GoProCamera::sendSetting(uint8_t setting_id, uint8_t value) {
     if (!_settingChar) return;
     uint8_t buf[] = {0x03, setting_id, 0x01, value};
+    if (_debugBle) bleDebugDump(DBG_SERIAL, "TX", "GP-0074", buf, sizeof(buf));
     _settingChar->writeValue(buf, sizeof(buf), false);
 }
 
@@ -307,6 +309,7 @@ void GoProCamera::sendCmd(uint8_t cmd_id, const uint8_t *params, uint8_t param_l
     buf[1] = cmd_id;
     if (params && param_len > 0)
         memcpy(buf + 2, params, param_len);
+    if (_debugBle) bleDebugDump(DBG_SERIAL, "TX", "GP-0072", buf, 1 + msg_len);
     _cmdChar->writeValue(buf, 1 + msg_len, false);
 }
 
@@ -314,6 +317,7 @@ void GoProCamera::sendHardwareInfoQuery() {
     if (!_cmdChar) return;
     // Packet: [0x01, 0x3C]  (header=1, cmd=GetHardwareInfo, no params)
     const uint8_t buf[] = {0x01, GP_CMD_GET_HARDWARE_INFO};
+    if (_debugBle) bleDebugDump(DBG_SERIAL, "TX", "GP-0072", buf, sizeof(buf));
     _cmdChar->writeValue(const_cast<uint8_t *>(buf), sizeof(buf), false);
     DBG_SERIAL.println("[GP] Get hardware info sent");
 }
@@ -342,6 +346,7 @@ void GoProCamera::sendRegisterQuery() {
     buf[0] = payload_len & 0x1F;
     buf[1] = GP_QUERY_REGISTER_STATUS;
     memcpy(buf + 2, ids, sizeof(ids));
+    if (_debugBle) bleDebugDump(DBG_SERIAL, "TX", "GP-0076", buf, 1 + payload_len);
     _queryChar->writeValue(buf, 1 + payload_len, false);
     DBG_SERIAL.println("[GP] Register for status + setting updates sent");
 }
@@ -414,16 +419,19 @@ void GoProCamera::queryNotifyCallback(BLERemoteCharacteristic * /*ch*/,
 // ─── Notification handling ────────────────────────────────────────────────────
 
 void GoProCamera::handleCmdNotification(uint8_t *data, size_t len) {
+    if (_debugBle) bleDebugDump(DBG_SERIAL, "RX", "GP-0073", data, len);
     if (_cmdRx.feed(data, len))
         handleCmdMessage(_cmdRx.buf, _cmdRx.expected);
 }
 
 void GoProCamera::handleSettingNotification(uint8_t *data, size_t len) {
+    if (_debugBle) bleDebugDump(DBG_SERIAL, "RX", "GP-0075", data, len);
     if (_settingRx.feed(data, len))
         handleSettingMessage(_settingRx.buf, _settingRx.expected);
 }
 
 void GoProCamera::handleQueryNotification(uint8_t *data, size_t len) {
+    if (_debugBle) bleDebugDump(DBG_SERIAL, "RX", "GP-0077", data, len);
     if (_queryRx.feed(data, len))
         handleQueryMessage(_queryRx.buf, _queryRx.expected);
 }
