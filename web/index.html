@@ -869,8 +869,11 @@ function collectCameraLine(line) {
 function parseCameraLines(lines) {
   const cameras = [];
   for (const line of lines) {
-    // [reg]   N: NAME(28 padded chars)  aa:bb:cc:dd:ee:ff  DJI/GoPro  [tag]
-    const m = line.match(/^\[reg\]\s+(\d+):\s(.+?)\s{2,}([0-9a-fA-F:]{17})\s+(DJI|GoPro|Caddx)(.*)/);
+    // [reg]   N: NAME(28 padded chars)  ADDR(MAC or Caddx SSID)  DJI/GoPro/Caddx  [tag]
+    // ADDR isn't fixed-format — Caddx entries store a Wi-Fi SSID there
+    // instead of a MAC — so it's delimited the same way NAME is: lazily,
+    // up to the next 2+-space run.
+    const m = line.match(/^\[reg\]\s+(\d+):\s(.+?)\s{2,}(.+?)\s{2,}(DJI|GoPro|Caddx)(.*)/);
     if (m) cameras.push({
       idx:  parseInt(m[1]),
       name: m[2].trim(),

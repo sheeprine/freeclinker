@@ -623,7 +623,7 @@ async function loadCameras() {
 
 function renderCameraTable(list) {
   if (!list || list.length === 0) {
-    camTableWrap.innerHTML = '<div class="cam-empty">No cameras saved yet.<br>Cameras are added automatically when you connect to them.</div>';
+    camTableWrap.innerHTML = '<div class="cam-empty">No cameras saved yet.<br>Cameras are added automatically when you connect to them (Caddx included, once it successfully joins a network).</div>';
     return;
   }
   let html = '<table class="cam-table"><thead><tr>'
@@ -636,7 +636,7 @@ function renderCameraTable(list) {
       <td>${c.idx}</td>
       <td>${escHtml(c.name)}${badges}</td>
       <td style="font-family:monospace">${escHtml(c.addr)}</td>
-      <td>${c.type === 1 ? 'GoPro' : 'DJI'}</td>
+      <td>${c.type === 1 ? 'GoPro' : c.type === 2 ? 'Caddx' : 'DJI'}</td>
       <td class="cam-actions">
         <button onclick="camConnect(${c.idx})">Connect</button>
         <button onclick="camRemove(${c.idx})">Remove</button>

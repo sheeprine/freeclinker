@@ -142,11 +142,13 @@ void setup() {
     mspSerial.setArmCallback(onArmStateChange);
     mspSerial.setAuxSwitchCallback(onAuxSwitch);
 
-    // Caddx has no BLE scan/pairing flow, so it does not use the BLE camera
-    // registry or strict-camera fallback logic — it just joins the
-    // configured Wi-Fi network directly (see caddx_camera.h).
+    // Caddx has no BLE scan/pairing flow or strict-camera fallback logic —
+    // it just joins a Wi-Fi network directly — but it does still use the
+    // registry, to remember multiple Orcas by SSID/password and read
+    // whichever is preferred at begin() (see caddx_camera.h).
     djiCamera.setRegistry(&cameraRegistry);
     goProCamera.setRegistry(&cameraRegistry);
+    caddxCamera.setRegistry(&cameraRegistry);
 
     const bool strict = configManager.config().strictCamera;
     djiCamera.setStrictCamera(strict);
@@ -155,9 +157,6 @@ void setup() {
     const bool debugBle = configManager.config().debugBle;
     djiCamera.setDebugBle(debugBle);
     goProCamera.setDebugBle(debugBle);
-
-    caddxCamera.setWifiCredentials(configManager.config().caddxSsid,
-                                   configManager.config().caddxPass);
 
     activeCamera->setCameraCallback(onCameraData);
     configManager.setCamera(activeCamera, &currentCamera);

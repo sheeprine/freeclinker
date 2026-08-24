@@ -49,9 +49,11 @@ int CameraRegistry::findByAddr(const char *addr) const {
 }
 
 void CameraRegistry::onConnected(const char *name, const char *addr,
-                                   uint8_t addrType, uint8_t cameraType) {
+                                   uint8_t addrType, uint8_t cameraType,
+                                   const char *pass) {
     int idx = findByAddr(addr);
-    if (idx < 0) {
+    const bool isNew = (idx < 0);
+    if (isNew) {
         if (_count < CAMREG_MAX) {
             idx = (int)_count++;
         } else {
@@ -68,6 +70,8 @@ void CameraRegistry::onConnected(const char *name, const char *addr,
     strlcpy(_entries[idx].addr, addr, CAMREG_ADDR_LEN);
     _entries[idx].addrType   = addrType;
     _entries[idx].cameraType = cameraType;
+    if (pass)       strlcpy(_entries[idx].pass, pass, CAMREG_PASS_LEN);
+    else if (isNew) _entries[idx].pass[0] = '\0';
     _lastIdx     = (int8_t)idx;
     _selectedIdx = -1;
     save();
@@ -83,6 +87,21 @@ uint8_t CameraRegistry::preferredAddrType() const {
     int idx = (_selectedIdx >= 0) ? _selectedIdx : _lastIdx;
     if (idx < 0 || idx >= (int)_count) return 0;
     return _entries[idx].addrType;
+}
+
+bool CameraRegistry::preferredEntry(uint8_t wantType, CameraEntry &out) const {
+    int idx = (_selectedIdx >= 0) ? _selectedIdx : _lastIdx;
+    if (idx < 0 || idx >= (int)_count) return false;
+    if (_entries[idx].cameraType != wantType) return false;
+    out = _entries[idx];
+    return true;
+}
+
+bool CameraRegistry::setPassword(uint8_t idx, const char *pass) {
+    if (idx >= _count) return false;
+    strlcpy(_entries[idx].pass, pass, CAMREG_PASS_LEN);
+    save();
+    return true;
 }
 
 void CameraRegistry::selectCamera(uint8_t idx) {
@@ -129,7 +148,12 @@ void CameraRegistry::printList(Stream &out) const {
         if (isLast && isSel)  tag = " [last+sel]";
         else if (isLast)      tag = " [last]";
         else if (isSel)       tag = " [selected]";
-        out.printf("[reg]  %2u: %-28s %s  %s%s\n", i,
+        // Two literal spaces (not one) before addr: %-28s only pads up to
+        // its width, so a name at or past 28 chars (real Caddx device
+        // names routinely are) would otherwise leave just one space —
+        // web/index.html's parser needs a guaranteed 2+-space run to find
+        // the field boundary, same as it already gets before the type.
+        out.printf("[reg]  %2u: %-28s  %s  %s%s\n", i,
                    _entries[i].name, _entries[i].addr,
                    cameraTypeName(_entries[i].cameraType), tag);
     }

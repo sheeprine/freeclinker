@@ -1,5 +1,6 @@
 #include "caddx_camera.h"
 #include "caddx_protocol.h"
+#include "camera_registry.h"
 #include "config.h"
 #include "dji_protocol.h"  // for DJI_MODE_* constants used in mode mapping
 #include <HTTPClient.h>
@@ -10,20 +11,35 @@
 // on aggregate — the same 2 Hz-ish ballpark the BLE cameras push at.
 static constexpr uint32_t CADDX_POLL_INTERVAL_MS = 700;
 static constexpr uint32_t CADDX_HTTP_TIMEOUT_MS  = 1200;
-static constexpr uint32_t CADDX_WIFI_RETRY_MS    = 5000;
+
+// Every Orca ships with this fixed factory Wi-Fi password (user-confirmed).
+// Tried first when no password has been explicitly configured for an SSID.
+static constexpr const char *CADDX_DEFAULT_PASSWORD = "12345678";
+// How long to wait for association before assuming the default password
+// guess was wrong and telling the user to set the real one. Wi-Fi.h gives
+// no clean "auth failed" signal distinct from "camera not in range" — this
+// is a grace period, not a definitive diagnosis. Measured against a real
+// Orca: a *correct* password can still take upwards of 15s to fully
+// associate, so this needs real headroom above that to avoid false
+// positives — matches WIFI_AP_START_DELAY_MS's order of magnitude.
+static constexpr uint32_t CADDX_CONNECT_TIMEOUT_MS = 30000;
 
 // ─── Public ──────────────────────────────────────────────────────────────────
 
-void CaddxCamera::setWifiCredentials(const char *ssid, const char *password) {
-    _ssid     = ssid ? ssid : "";
-    _password = password ? password : "";
-}
-
 void CaddxCamera::begin() {
-    if (_ssid.length() == 0) {
-        DBG_SERIAL.println("[caddx] No Wi-Fi SSID configured — set with 'set caddx_ssid'");
+    // No BLE-style discovery to fall back on if the registry's overall
+    // "preferred" entry happens to be some other camera type, so this has
+    // to be scoped — see preferredEntry()'s doc comment.
+    CameraEntry e;
+    if (!_registry || !_registry->preferredEntry(/*Caddx=*/2, e)) {
+        DBG_SERIAL.println("[caddx] No Wi-Fi network configured — set with 'set caddx_ssid'");
         return;
     }
+    _ssid = e.addr;
+    _usingDefaultPass   = (e.pass[0] == '\0');
+    _passWarningPrinted = false;
+    _password = _usingDefaultPass ? CADDX_DEFAULT_PASSWORD : e.pass;
+
     // Concurrent AP+STA: web_server.cpp runs the config AP via WiFi.softAP()
     // independently of this. Explicitly requesting APSTA here (rather than
     // just STA) means joining the camera's network never disables that AP
@@ -34,8 +50,10 @@ void CaddxCamera::begin() {
     // no-ops its internal re-init when that bit is already set, so the
     // config portal AP silently never starts broadcasting.
     WiFi.mode(WIFI_MODE_APSTA);
-    DBG_SERIAL.printf("[caddx] Joining Wi-Fi \"%s\"...\n", _ssid.c_str());
-    WiFi.begin(_ssid.c_str(), _password.length() ? _password.c_str() : nullptr);
+    DBG_SERIAL.printf("[caddx] Joining Wi-Fi \"%s\"%s...\n", _ssid.c_str(),
+                      _usingDefaultPass ? " (trying factory default password)" : "");
+    _connectStartMs = millis();
+    WiFi.begin(_ssid.c_str(), _password.c_str());
 }
 
 void CaddxCamera::update() {
@@ -65,6 +83,14 @@ void CaddxCamera::update() {
         // else to do here besides waiting. WiFi.begin() only needs to be
         // called again if the SSID itself changes at runtime, which is out
         // of scope (requires a reboot today, same as camera_type).
+        if (_usingDefaultPass && !_passWarningPrinted &&
+            (millis() - _connectStartMs) > CADDX_CONNECT_TIMEOUT_MS) {
+            _passWarningPrinted = true;
+            DBG_SERIAL.printf("[caddx] Still not connected to \"%s\" after trying the "
+                              "factory default password — if that's not right for this "
+                              "camera, set it with 'set caddx_pass <password>' and reboot\n",
+                              _ssid.c_str());
+        }
         return;
     }
 
@@ -137,6 +163,13 @@ void CaddxCamera::pollDeviceAttr() {
 
     _attrProbed = true;
     _connected  = true;
+
+    // Record this network in the registry so multiple Orcas can be
+    // remembered and picked between (same trigger point BLE/GoPro use —
+    // a verified successful connection, not just a typed-in SSID).
+    if (_registry)
+        _registry->onConnected(name.length() ? name.c_str() : _ssid.c_str(),
+                               _ssid.c_str(), /*addrType=*/0, /*Caddx=*/2);
 }
 
 // ─── Telemetry polling ────────────────────────────────────────────────────────

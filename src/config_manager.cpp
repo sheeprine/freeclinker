@@ -18,8 +18,6 @@ static constexpr const char *KEY_OSD3 = "osd3_tpl";
 static constexpr const char *KEY_OSD4 = "osd4_tpl";
 static constexpr const char *KEY_SCM  = "strict_cam";
 static constexpr const char *KEY_DBG  = "debug_ble";
-static constexpr const char *KEY_CSSID = "caddx_ssid";
-static constexpr const char *KEY_CPASS = "caddx_pass";
 
 void ConfigManager::begin(Stream &serial) {
     _serial = &serial;
@@ -46,8 +44,6 @@ void ConfigManager::load() {
     loadStr(_prefs, KEY_OSD2, _cfg.osd2Tpl, sizeof(_cfg.osd2Tpl), DEFAULT_OSD2_TPL);
     loadStr(_prefs, KEY_OSD3, _cfg.osd3Tpl, sizeof(_cfg.osd3Tpl), DEFAULT_OSD3_TPL);
     loadStr(_prefs, KEY_OSD4, _cfg.osd4Tpl, sizeof(_cfg.osd4Tpl), DEFAULT_OSD4_TPL);
-    loadStr(_prefs, KEY_CSSID, _cfg.caddxSsid, sizeof(_cfg.caddxSsid), DEFAULT_CADDX_SSID);
-    loadStr(_prefs, KEY_CPASS, _cfg.caddxPass, sizeof(_cfg.caddxPass), DEFAULT_CADDX_PASS);
 }
 
 void ConfigManager::save() {
@@ -62,8 +58,6 @@ void ConfigManager::save() {
     _prefs.putString(KEY_OSD2, _cfg.osd2Tpl);
     _prefs.putString(KEY_OSD3, _cfg.osd3Tpl);
     _prefs.putString(KEY_OSD4, _cfg.osd4Tpl);
-    _prefs.putString(KEY_CSSID, _cfg.caddxSsid);
-    _prefs.putString(KEY_CPASS, _cfg.caddxPass);
 }
 
 static const char *cameraTypeName(uint8_t t) {
@@ -89,8 +83,12 @@ void ConfigManager::printAll(Stream &out) {
     out.printf("[cfg] osd2            = %s\n", _cfg.osd2Tpl);
     out.printf("[cfg] osd3            = %s\n", _cfg.osd3Tpl);
     out.printf("[cfg] osd4            = %s\n", _cfg.osd4Tpl);
-    out.printf("[cfg] caddx_ssid      = %s\n", _cfg.caddxSsid);
-    out.printf("[cfg] caddx_pass      = %s\n", strlen(_cfg.caddxPass) ? "(set)" : "(not set)");
+
+    CameraEntry ce;
+    bool haveCaddx = _registry && _registry->preferredEntry(/*Caddx=*/2, ce);
+    out.printf("[cfg] caddx_ssid      = %s\n", haveCaddx ? ce.addr : "");
+    out.printf("[cfg] caddx_pass      = %s\n",
+               (haveCaddx && strlen(ce.pass)) ? "(set)" : "(not set — uses factory default)");
 }
 
 void ConfigManager::handleLine(const char *line, Stream &out) {
@@ -117,8 +115,8 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         out.println("  set osd3 <template>        - OSD Custom Message 3 template (default: settings)");
         out.println("  set osd4 <template>        - OSD Custom Message 4 template (default: storage)");
         out.println("  Tokens: {bat} {rec} {mode} {res} {fps} {eis} {rleft} {rcap}");
-        out.println("  set caddx_ssid <ssid>      - Wi-Fi network the Caddx Orca creates (camera_type=2)");
-        out.println("  set caddx_pass <password>  - Wi-Fi password for the above (default: 12345678, reboot required)");
+        out.println("  set caddx_ssid <ssid>      - remember + select a Caddx Orca's Wi-Fi network (camera_type=2)");
+        out.println("  set caddx_pass <password>  - password for the SSID above (tries factory default 12345678 first; reboot required)");
         out.println("  reset                      - restore defaults");
         out.println("  reboot                     - restart the ESP32");
         out.println("  status                     - report ESP32 and camera status");
@@ -296,14 +294,18 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         }
 
         if (strncmp(rest, "caddx_ssid ", 11) == 0) {
-            setCaddxSsid(rest + 11);
-            out.printf("[cfg] caddx_ssid = %s (saved — reboot to apply)\n", _cfg.caddxSsid);
+            if (setCaddxSsid(rest + 11))
+                out.printf("[cfg] caddx_ssid = %s (saved to camera list — reboot to apply)\n", rest + 11);
+            else
+                out.println("[cfg] caddx_ssid: value required");
             return;
         }
 
         if (strncmp(rest, "caddx_pass ", 11) == 0) {
-            setCaddxPass(rest + 11);
-            out.println("[cfg] caddx_pass = (set) (saved — reboot to apply)");
+            if (setCaddxPass(rest + 11))
+                out.println("[cfg] caddx_pass = (set) (saved to camera list — reboot to apply)");
+            else
+                out.println("[cfg] caddx_pass: set caddx_ssid first");
             return;
         }
 
@@ -365,8 +367,12 @@ void ConfigManager::handleCamerasCmd(const char *sub, Stream &out) {
             _registry->selectCamera(idx);
             CameraEntry e;
             _registry->getEntry(idx, e);
-            out.printf("[reg] Camera %u selected: \"%s\" %s — will connect on next scan\n",
-                       idx, e.name, e.addr);
+            // Caddx reads the registry's preferred entry directly at
+            // begin() — selectCamera() above is all it needs — but unlike
+            // BLE/GoPro it has no live rescan to act on a selection while
+            // running, so it only takes effect after a reboot.
+            out.printf("[reg] Camera %u selected: \"%s\" %s — will connect on next %s\n",
+                       idx, e.name, e.addr, e.cameraType == 2 ? "reboot" : "scan");
         } else {
             out.printf("[reg] No camera at index %u (list has %u entr%s)\n",
                        idx, _registry->count(),
@@ -487,12 +493,20 @@ void ConfigManager::setOsdTemplate(uint8_t n, const char *tpl) {
     _prefs.putString(key, dst);
 }
 
-void ConfigManager::setCaddxSsid(const char *ssid) {
-    strlcpy(_cfg.caddxSsid, ssid, sizeof(_cfg.caddxSsid));
-    _prefs.putString(KEY_CSSID, _cfg.caddxSsid);
+bool ConfigManager::setCaddxSsid(const char *ssid) {
+    if (!_registry || !ssid || !ssid[0]) return false;
+    // Same upsert-and-select path BLE/GoPro use after a live connection —
+    // Caddx just calls it manually since there's no discovery step to
+    // trigger it automatically. Omitting `pass` here preserves whatever
+    // password (if any) an existing entry for this SSID already has.
+    _registry->onConnected(ssid, ssid, /*addrType=*/0, /*Caddx=*/2);
+    return true;
 }
 
-void ConfigManager::setCaddxPass(const char *pass) {
-    strlcpy(_cfg.caddxPass, pass, sizeof(_cfg.caddxPass));
-    _prefs.putString(KEY_CPASS, _cfg.caddxPass);
+bool ConfigManager::setCaddxPass(const char *pass) {
+    if (!_registry) return false;
+    int idx = (_registry->selectedIdx() >= 0) ? _registry->selectedIdx() : _registry->lastIdx();
+    CameraEntry e;
+    if (idx < 0 || !_registry->getEntry((uint8_t)idx, e) || e.cameraType != 2) return false;
+    return _registry->setPassword((uint8_t)idx, pass);
 }

@@ -11,7 +11,6 @@ struct CameraData;      // forward declaration
 class ConfigManager {
 public:
     static constexpr uint8_t OSD_TPL_LEN = 32;
-    static constexpr uint8_t WIFI_CRED_LEN = 64;  // WPA2 passphrase max is 63 chars + NUL
 
     struct Config {
         uint32_t disarmStopDelayMs;  // delay between FC disarm and stopping recording
@@ -26,10 +25,9 @@ public:
         char osd2Tpl[OSD_TPL_LEN];  // Custom Message 2 (default: recording state)
         char osd3Tpl[OSD_TPL_LEN];  // Custom Message 3 (default: camera settings)
         char osd4Tpl[OSD_TPL_LEN];  // Custom Message 4 (default: storage)
-        // Caddx Orca only — the camera has no BLE pairing flow, so the Wi-Fi
-        // network it creates has to be configured explicitly (see caddx_camera.h).
-        char caddxSsid[WIFI_CRED_LEN];
-        char caddxPass[WIFI_CRED_LEN];
+        // No Caddx SSID/password here — those live in CameraRegistry
+        // (see setCaddxSsid()/setCaddxPass()), same storage every other
+        // camera's connection identity uses.
     };
 
     static constexpr uint32_t DEFAULT_DISARM_STOP_DELAY_MS = 0;
@@ -43,10 +41,6 @@ public:
     static constexpr const char *DEFAULT_OSD2_TPL = "{rec}";
     static constexpr const char *DEFAULT_OSD3_TPL = "{mode} {res}/{fps} {eis}";
     static constexpr const char *DEFAULT_OSD4_TPL = "{rleft} {rcap}";
-    static constexpr const char *DEFAULT_CADDX_SSID = "";
-    // Orca ships with this fixed factory Wi-Fi password on every unit
-    // (user-confirmed); the SSID is still per-camera and must be set.
-    static constexpr const char *DEFAULT_CADDX_PASS = "12345678";
 
     void begin(Stream &serial);
     void update();
@@ -69,8 +63,11 @@ public:
     void setStrictCamera(bool v);
     void setDebugBle(bool v);
     void setOsdTemplate(uint8_t n, const char *tpl);  // n = 1..4
-    void setCaddxSsid(const char *ssid);
-    void setCaddxPass(const char *pass);
+    // Both write into the registry's preferred/newest Caddx entry, not NVS
+    // (see CameraEntry) — return false if there's nothing to write to yet
+    // (setCaddxPass before any setCaddxSsid) or ssid is empty.
+    bool setCaddxSsid(const char *ssid);
+    bool setCaddxPass(const char *pass);
 
 private:
     void load();

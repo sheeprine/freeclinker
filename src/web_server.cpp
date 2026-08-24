@@ -75,7 +75,11 @@ void WebConfigServer::handleGetConfig() {
     const auto &c = _cfg->config();
     JsonDocument doc;
     doc["camera_type"]    = c.cameraType;
-    doc["caddx_ssid"]     = c.caddxSsid;  // password intentionally omitted — write-only
+    // caddx_ssid lives in the camera registry, not Config — password
+    // intentionally omitted here too, same as before (write-only).
+    CameraEntry caddxEntry;
+    doc["caddx_ssid"] = (_reg && _reg->preferredEntry(/*Caddx=*/2, caddxEntry))
+                       ? caddxEntry.addr : "";
     doc["disarm_delay"]   = c.disarmStopDelayMs;
     doc["stop_on_disarm"] = c.stopOnDisarm;
     doc["aux_channel"]    = c.auxChannel;

@@ -148,3 +148,22 @@ set camera_type 1
 ```
 
 Then reboot the ESP32. To switch back to DJI: `set camera_type 0` and reboot.
+
+### Caddx Orca (Wi-Fi/HTTP)
+
+The Orca has no BLE pairing flow — it's controlled over the Wi-Fi network it creates itself, the same one the CaddxFPV app joins from a phone. Configure it via serial:
+
+```
+set camera_type 2
+set caddx_ssid <the Orca's SSID>
+```
+
+Use `wifi scan` beforehand to find the SSID if you don't already know it. On boot, the ESP32 tries the factory default password (`12345678`) first; if the camera doesn't have that password, it'll log a message after ~30s asking you to set the real one:
+
+```
+set caddx_pass <password>
+```
+
+Reboot after either command to apply.
+
+Just like DJI/GoPro cameras, every SSID the ESP32 successfully connects to is remembered in the camera list (`cameras list`) — configure multiple Orcas over time and switch between them with `cameras connect <idx>` (also requires a reboot, since Caddx has no live rescan to act on a selection while running).

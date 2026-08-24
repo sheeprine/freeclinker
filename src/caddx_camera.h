@@ -9,10 +9,16 @@
 // Unlike BLECamera (DJI) and GoProCamera, Orca is controlled over the
 // camera's own Wi-Fi access point using plain unauthenticated HTTP GET
 // requests to a CGI endpoint (the "Hi3510" action-camera protocol family —
-// see src/caddx_protocol.h for full provenance notes). There is no BLE scan
-// / pairing step and no CameraRegistry integration: the ESP32 simply joins
-// a pre-configured SSID/password (see setWifiCredentials()) exactly like the
-// official app requires the user to do from the phone's Wi-Fi settings.
+// see src/caddx_protocol.h for full provenance notes). There is no BLE
+// scan / pairing step, so the network to join has to be supplied
+// explicitly — but like BLECamera/GoProCamera, that comes from
+// CameraRegistry (begin() reads the preferred Caddx entry's SSID/
+// password), not a one-off setter. There's just no live discovery to
+// populate the registry with: config_manager.cpp's `set caddx_ssid`/
+// `set caddx_pass` write directly into it (see camera_registry.h), and
+// pollDeviceAttr() below confirms an entry once the network actually
+// works. `cameras connect <idx>` (config_manager.cpp) picks between
+// multiple remembered Orcas exactly like it does for BLE cameras.
 //
 // Connection sequence
 // ────────────────────
@@ -47,10 +53,6 @@ public:
     // confirmed against a real Orca.
     bool switchCameraMode(uint8_t mode) override;
 
-    // Must be called before begin(). Caddx has no BLE scan/registry, so the
-    // network to join has to be supplied explicitly (config_manager.cpp).
-    void setWifiCredentials(const char *ssid, const char *password);
-
 private:
     enum class RecordVariant : uint8_t { kUnknown, kRecordCgi, kRecord2Cgi };
 
@@ -77,6 +79,13 @@ private:
     bool _wifiWasConnected = false;
     bool _connected         = false;  // application-level: getdeviceattr.cgi succeeded
     bool _attrProbed        = false;
+
+    // No password on record means "try the factory default first" — see
+    // begin(). If that guess is wrong, update() logs a one-shot hint after
+    // a grace period rather than retrying it forever with no feedback.
+    bool     _usingDefaultPass    = false;
+    bool     _passWarningPrinted  = false;
+    uint32_t _connectStartMs      = 0;
 
     RecordVariant _recordVariant = RecordVariant::kUnknown;
     bool          _isNewApp      = false;  // hardversion == "NewAPP"
