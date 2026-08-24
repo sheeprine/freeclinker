@@ -28,5 +28,6 @@ private:
     void handleGetConfig();
     void handlePostConfig();
     void handleGetCameras();
+    void handleWifiScan();
     void handleCli();
 };

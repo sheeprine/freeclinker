@@ -42,6 +42,7 @@ void WebConfigServer::begin(ConfigManager &cfg, CameraRegistry *reg, Stream *dbg
     _server.on("/api/config",  HTTP_GET,  [this]() { handleGetConfig();   });
     _server.on("/api/config",  HTTP_POST, [this]() { handlePostConfig();  });
     _server.on("/api/cameras", HTTP_GET,  [this]() { handleGetCameras();  });
+    _server.on("/api/wifi_scan", HTTP_GET, [this]() { handleWifiScan();   });
     _server.on("/api/cli",     HTTP_POST, [this]() { handleCli();         });
 
     _server.begin();
@@ -112,6 +113,26 @@ void WebConfigServer::handlePostConfig() {
 
 void WebConfigServer::handleGetCameras() {
     String json = _reg ? _reg->toJson() : "[]";
+    _server.send(200, "application/json", json);
+}
+
+// Blocking scan (a few seconds) — acceptable for a manual "Scan" click.
+// WIFI_MODE_APSTA keeps this server's own AP alive across the scan (that's
+// how the browser is even talking to us right now).
+void WebConfigServer::handleWifiScan() {
+    WiFi.mode(WIFI_MODE_APSTA);
+    int n = WiFi.scanNetworks();
+    JsonDocument doc;
+    JsonArray arr = doc.to<JsonArray>();
+    for (int i = 0; i < n; i++) {
+        JsonObject o = arr.add<JsonObject>();
+        o["ssid"] = WiFi.SSID(i);
+        o["rssi"] = WiFi.RSSI(i);
+        o["open"] = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
+    }
+    WiFi.scanDelete();
+    String json;
+    serializeJson(doc, json);
     _server.send(200, "application/json", json);
 }
 

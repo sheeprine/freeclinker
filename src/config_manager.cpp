@@ -1,6 +1,7 @@
 #include "config_manager.h"
 #include "camera_registry.h"
 #include "config.h"
+#include <WiFi.h>
 #include <cstring>
 #include <cstdlib>
 
@@ -118,6 +119,7 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         out.println("  cameras connect <idx>      - select camera for next connection");
         out.println("  cameras remove <idx>       - remove camera from list");
         out.println("  cameras clear              - remove all saved cameras");
+        out.println("  wifi scan                  - scan for nearby Wi-Fi networks (find the Caddx Orca's SSID)");
         return;
     }
 
@@ -246,6 +248,13 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         return;
     }
 
+    if (strncmp(line, "wifi", 4) == 0) {
+        const char *sub = line + 4;
+        while (*sub == ' ') sub++;
+        handleWifiCmd(sub, out);
+        return;
+    }
+
     if (strlen(line) > 0)
         out.printf("[cfg] Unknown command: %s\n", line);
 }
@@ -301,6 +310,33 @@ void ConfigManager::handleCamerasCmd(const char *sub, Stream &out) {
     out.println("  cameras connect <idx>  - select camera for next connection");
     out.println("  cameras remove <idx>   - remove camera from list");
     out.println("  cameras clear          - remove all saved cameras");
+}
+
+// Blocking scan (a few seconds) — fine for a manual, setup-time "wifi scan"
+// command, but will briefly interrupt any Caddx camera Wi-Fi traffic in
+// progress at the time. WIFI_MODE_APSTA keeps the config-portal AP (if any)
+// alive across the scan, same coexistence mode CaddxCamera itself uses.
+void ConfigManager::handleWifiCmd(const char *sub, Stream &out) {
+    if (strcmp(sub, "scan") == 0 || strlen(sub) == 0) {
+        WiFi.mode(WIFI_MODE_APSTA);
+        out.println("[wifi] Scanning...");
+        int n = WiFi.scanNetworks();
+        if (n <= 0) {
+            out.println("[wifi] No networks found");
+        } else {
+            out.printf("[wifi] %d network(s) found:\n", n);
+            for (int i = 0; i < n; i++) {
+                out.printf("[wifi]  %2d: %-32s RSSI=%-4d %s\n", i,
+                           WiFi.SSID(i).c_str(), WiFi.RSSI(i),
+                           WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "OPEN" : "SEC");
+            }
+        }
+        WiFi.scanDelete();
+        return;
+    }
+
+    out.println("Wi-Fi commands:");
+    out.println("  wifi scan   - scan for nearby Wi-Fi networks (find the Caddx Orca's SSID)");
 }
 
 void ConfigManager::processCommand(const char *line, Stream &out) {

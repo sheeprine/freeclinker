@@ -220,6 +220,17 @@
     .cam-badge.sel  { background: #fef9c3; color: #854d0e; }
     .cam-actions { display: flex; gap: 6px; }
     .cam-empty { color: #6b7280; font-size: 13px; padding: 24px; text-align: center; }
+    .wifi-results { width: 100%; margin-top: 6px; border: 1px solid #e5e7eb; border-radius: 4px;
+                     max-height: 160px; overflow-y: auto; background: #f9fafb; }
+    .wifi-results:empty { display: none; border: none; }
+    .wifi-net { display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+                font-size: 12px; cursor: pointer; border-bottom: 1px solid #f3f4f6; }
+    .wifi-net:last-child { border-bottom: none; }
+    .wifi-net:hover { background: #eff6ff; }
+    .wifi-net-ssid { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wifi-net-rssi { color: #9ca3af; font-size: 11px; }
+    .wifi-net-lock { color: #9ca3af; font-size: 11px; }
+    .wifi-scan-msg { color: #6b7280; font-size: 12px; padding: 8px 10px; }
 
     /* ── CLI panel ───────────────────────────────────────────────────────────── */
     #terminal {
@@ -327,10 +338,15 @@
       </div>
 
       <!-- Caddx Wi-Fi credentials (Caddx Orca has no BLE pairing — it's a Wi-Fi CGI camera) -->
-      <div class="cfg-field" style="flex-direction:column; align-items:flex-start;">
+      <!-- Hidden until camera type = Caddx Orca, see updateCameraTypeState() -->
+      <div class="cfg-field" id="caddxWifiField" style="flex-direction:column; align-items:flex-start; display:none;">
         <div class="cfg-field-name">Caddx Wi-Fi network</div>
-        <div class="cfg-field-desc">Only used when camera type is Caddx Orca. The camera's own Wi-Fi SSID/password (same network you'd join from the phone's Wi-Fi settings for the CaddxFPV app). <strong>Reboot required to apply.</strong></div>
-        <input class="tpl-input" id="caddxSsid" type="text" placeholder="SSID" maxlength="32" spellcheck="false" disabled>
+        <div class="cfg-field-desc">The camera's own Wi-Fi SSID/password (same network you'd join from the phone's Wi-Fi settings for the CaddxFPV app). <strong>Reboot required to apply.</strong></div>
+        <div class="num-wrap" style="width:100%;">
+          <input class="tpl-input" id="caddxSsid" type="text" placeholder="SSID" maxlength="32" spellcheck="false" disabled style="margin-top:0;flex:1;width:auto;">
+          <button id="caddxScanBtn" type="button" disabled>Scan</button>
+        </div>
+        <div id="caddxScanResults" class="wifi-results"></div>
         <input class="tpl-input" id="caddxPass" type="text" placeholder="Password" maxlength="63" spellcheck="false" disabled>
       </div>
 
@@ -519,8 +535,11 @@ const baudSelect    = document.getElementById('baudRate');
 const readBtn        = document.getElementById('readBtn');
 const applyBtn       = document.getElementById('applyBtn');
 const cameraTypeSel  = document.getElementById('cameraType');
-const caddxSsidInput = document.getElementById('caddxSsid');
-const caddxPassInput = document.getElementById('caddxPass');
+const caddxWifiField    = document.getElementById('caddxWifiField');
+const caddxSsidInput    = document.getElementById('caddxSsid');
+const caddxPassInput    = document.getElementById('caddxPass');
+const caddxScanBtn      = document.getElementById('caddxScanBtn');
+const caddxScanResults  = document.getElementById('caddxScanResults');
 const stopToggle          = document.getElementById('stopOnDisarm');
 const strictCameraToggle  = document.getElementById('strictCamera');
 const delayInput     = document.getElementById('disarmDelay');
@@ -598,6 +617,7 @@ function parseConfigLine(line) {
 
   if (key === 'camera_type') {
     cameraTypeSel.value = val === 'GoPro' ? '1' : (val === 'Caddx' ? '2' : '0');
+    updateCameraTypeState();
   } else if (key === 'caddx_ssid') {
     caddxSsidInput.value = val;
   } else if (key === 'disarm_delay') {
@@ -680,6 +700,7 @@ async function startReading() {
         log(clean);
         parseConfigLine(clean);
         collectCameraLine(clean);
+        collectWifiScanLine(clean);
       }
     }
   } catch {
@@ -758,6 +779,11 @@ applyBtn.addEventListener('click', async () => {
   await sendCommand(`set stop_on_disarm ${stop}`);
   flashSaved(savedMsg);
 });
+
+cameraTypeSel.addEventListener('change', updateCameraTypeState);
+function updateCameraTypeState() {
+  caddxWifiField.style.display = parseInt(cameraTypeSel.value) === 2 ? 'flex' : 'none';
+}
 
 auxApplyBtn.addEventListener('click', async () => {
   const ch   = auxChannelSel.value;
@@ -898,6 +924,88 @@ camClearBtn.addEventListener('click', async () => {
   setTimeout(() => { startCamCapture(); sendCommand('cameras list'); }, 150);
 });
 
+// ── Wi-Fi scan (Caddx SSID picker) ──────────────────────────────────────────────
+let collectingWifi = false;
+let wifiLines       = [];
+let wifiTimer       = null;
+
+function startWifiCapture() {
+  collectingWifi = true;
+  wifiLines = [];
+  clearTimeout(wifiTimer);
+  caddxScanResults.innerHTML = '<div class="wifi-scan-msg">Scanning…</div>';
+  // Fallback: render after 4s even if the device never sent a closing line
+  // (a full scan typically takes 1-3s)
+  wifiTimer = setTimeout(finalizeWifiCapture, 4000);
+}
+
+function finalizeWifiCapture() {
+  if (!collectingWifi) return;
+  collectingWifi = false;
+  clearTimeout(wifiTimer);
+  renderWifiResults(parseWifiLines(wifiLines));
+}
+
+function collectWifiScanLine(line) {
+  if (!collectingWifi) return;
+  if (line.startsWith('[wifi]')) {
+    wifiLines.push(line);
+    // A numbered network row is the last thing we expect per scan; a
+    // "No networks found" or empty non-[wifi] line also ends it via the
+    // else-branch below. Reset the fallback timer on each arriving line.
+    clearTimeout(wifiTimer);
+    wifiTimer = setTimeout(finalizeWifiCapture, 300);
+  } else if (line.trim() && wifiLines.length > 0) {
+    finalizeWifiCapture();
+  }
+}
+
+function parseWifiLines(lines) {
+  const nets = [];
+  for (const line of lines) {
+    // [wifi]   0: SSID_NAME(32 padded chars)  RSSI=-45   OPEN
+    const m = line.match(/^\[wifi\]\s+(\d+):\s(.+?)\s+RSSI=(-?\d+)\s+(OPEN|SEC)/);
+    if (m) nets.push({ ssid: m[2].trim(), rssi: parseInt(m[3]), open: m[4] === 'OPEN' });
+  }
+  return nets;
+}
+
+function renderWifiResults(nets) {
+  caddxScanResults.innerHTML = '';
+  if (!nets || nets.length === 0) {
+    caddxScanResults.innerHTML = '<div class="wifi-scan-msg">No networks found.</div>';
+    return;
+  }
+  // Built with textContent/closures rather than innerHTML — SSIDs come from
+  // nearby radio broadcasts (untrusted input) and could contain
+  // quote/angle-bracket characters.
+  for (const n of [...nets].sort((a, b) => b.rssi - a.rssi)) {
+    const row = document.createElement('div');
+    row.className = 'wifi-net';
+    const ssidSpan = document.createElement('span');
+    ssidSpan.className = 'wifi-net-ssid';
+    ssidSpan.textContent = n.ssid || '(hidden)';
+    const lockSpan = document.createElement('span');
+    lockSpan.className = 'wifi-net-lock';
+    lockSpan.textContent = n.open ? '' : '🔒';
+    const rssiSpan = document.createElement('span');
+    rssiSpan.className = 'wifi-net-rssi';
+    rssiSpan.textContent = n.rssi + ' dBm';
+    row.append(ssidSpan, lockSpan, rssiSpan);
+    row.addEventListener('click', () => {
+      caddxSsidInput.value = n.ssid;
+      caddxScanResults.innerHTML = '';
+    });
+    caddxScanResults.appendChild(row);
+  }
+}
+
+caddxScanBtn.addEventListener('click', () => {
+  if (!port) return;
+  startWifiCapture();
+  sendCommand('wifi scan');
+});
+
 // ── UI state ──────────────────────────────────────────────────────────────────
 function setConnected(connected) {
   dot.className          = 'dot' + (connected ? ' connected' : '');
@@ -913,6 +1021,7 @@ function setConnected(connected) {
   cameraTypeSel.disabled = !connected;
   caddxSsidInput.disabled = !connected;
   caddxPassInput.disabled = !connected;
+  caddxScanBtn.disabled   = !connected;
   stopToggle.disabled         = !connected;
   strictCameraToggle.disabled = !connected;
   delayInput.disabled    = !connected;

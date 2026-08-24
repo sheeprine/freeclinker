@@ -122,6 +122,17 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
     .cam-empty { color: #6b7280; font-size: 13px; padding: 24px; text-align: center; }
     .cam-toolbar { width: 100%; max-width: 560px; display: flex; justify-content: flex-end;
                    gap: 8px; margin-bottom: 10px; }
+    .wifi-results { width: 100%; margin-top: 6px; border: 1px solid #e5e7eb; border-radius: 4px;
+                     max-height: 160px; overflow-y: auto; background: #f9fafb; }
+    .wifi-results:empty { display: none; border: none; }
+    .wifi-net { display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+                font-size: 12px; cursor: pointer; border-bottom: 1px solid #f3f4f6; }
+    .wifi-net:last-child { border-bottom: none; }
+    .wifi-net:hover { background: #eff6ff; }
+    .wifi-net-ssid { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wifi-net-rssi { color: #9ca3af; font-size: 11px; }
+    .wifi-net-lock { color: #9ca3af; font-size: 11px; }
+    .wifi-scan-msg { color: #6b7280; font-size: 12px; padding: 8px 10px; }
     #terminal { flex: 1; overflow-y: auto; padding: 12px 16px; background: #1a1a1a; color: #d4d4d4; }
     .line { white-space: pre-wrap; word-break: break-all; line-height: 1.55; }
     .line.sys { color: #6b7280; }
@@ -175,7 +186,20 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
         <select id="cameraType">
           <option value="0">DJI Action</option>
           <option value="1">GoPro</option>
+          <option value="2">Caddx Orca</option>
         </select>
+      </div>
+
+      <!-- Caddx Wi-Fi credentials (Caddx Orca has no BLE pairing — it's a Wi-Fi CGI camera) -->
+      <div class="cfg-field" id="caddxWifiField" style="flex-direction:column;align-items:flex-start;display:none;">
+        <div class="cfg-field-name">Caddx Wi-Fi network</div>
+        <div class="cfg-field-desc">The camera's own Wi-Fi SSID/password (same network you'd join from the phone's Wi-Fi settings for the CaddxFPV app). <strong>Reboot required to apply.</strong></div>
+        <div class="num-wrap" style="width:100%;">
+          <input class="tpl-input" id="caddxSsid" type="text" placeholder="SSID" maxlength="32" spellcheck="false" style="margin-top:0;flex:1;width:auto;">
+          <button id="caddxScanBtn" type="button">Scan</button>
+        </div>
+        <div id="caddxScanResults" class="wifi-results"></div>
+        <input class="tpl-input" id="caddxPass" type="text" placeholder="Password (default: 12345678)" maxlength="63" spellcheck="false">
       </div>
 
       <!-- Stop on disarm -->
@@ -349,6 +373,11 @@ const auxModeSel   = document.getElementById('auxMode');
 const auxSavedMsg  = document.getElementById('auxSavedMsg');
 const osdSavedMsg  = document.getElementById('osdSavedMsg');
 const cameraTypeSel = document.getElementById('cameraType');
+const caddxWifiField    = document.getElementById('caddxWifiField');
+const caddxSsidInput    = document.getElementById('caddxSsid');
+const caddxPassInput    = document.getElementById('caddxPass');
+const caddxScanBtn      = document.getElementById('caddxScanBtn');
+const caddxScanResults  = document.getElementById('caddxScanResults');
 const osd1Input    = document.getElementById('osd1');
 const osd2Input    = document.getElementById('osd2');
 const osd3Input    = document.getElementById('osd3');
@@ -390,6 +419,7 @@ async function loadConfig() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json();
     cameraTypeSel.value  = j.camera_type   ?? 0;
+    caddxSsidInput.value = j.caddx_ssid    ?? '';  // caddx_pass is write-only, never returned
     stopToggle.checked   = j.stop_on_disarm ?? true;
     delayInput.value     = j.disarm_delay  ?? 0;
     auxChannelSel.value  = j.aux_channel   ?? 0;
@@ -400,6 +430,7 @@ async function loadConfig() {
     osd4Input.value      = j.osd4 ?? '';
     updateDelayEquiv();
     updateAuxModeState();
+    updateCameraTypeState();
   } catch (e) {
     console.error('loadConfig:', e);
   }
@@ -466,14 +497,72 @@ readBtn.addEventListener('click', loadConfig);
 
 applyBtn.addEventListener('click', async () => {
   try {
-    await saveConfig({
+    const data = {
       camera_type:    parseInt(cameraTypeSel.value),
+      caddx_ssid:     caddxSsidInput.value,
       stop_on_disarm: stopToggle.checked,
       disarm_delay:   parseInt(delayInput.value) || 0
-    });
+    };
+    if (caddxPassInput.value) data.caddx_pass = caddxPassInput.value;
+    await saveConfig(data);
+    caddxPassInput.value = '';
     flashSaved(savedMsg);
   } catch (e) { console.error(e); }
 });
+
+cameraTypeSel.addEventListener('change', updateCameraTypeState);
+function updateCameraTypeState() {
+  caddxWifiField.style.display = parseInt(cameraTypeSel.value) === 2 ? 'flex' : 'none';
+}
+
+caddxScanBtn.addEventListener('click', async () => {
+  caddxScanBtn.disabled = true;
+  caddxScanBtn.textContent = 'Scanning…';
+  caddxScanResults.innerHTML = '<div class="wifi-scan-msg">Scanning…</div>';
+  try {
+    const r = await fetch('/api/wifi_scan');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const nets = await r.json();
+    renderWifiResults(nets);
+  } catch (e) {
+    caddxScanResults.innerHTML = '<div class="wifi-scan-msg">Scan failed.</div>';
+  } finally {
+    caddxScanBtn.disabled = false;
+    caddxScanBtn.textContent = 'Scan';
+  }
+});
+
+function renderWifiResults(nets) {
+  caddxScanResults.innerHTML = '';
+  if (!nets || nets.length === 0) {
+    caddxScanResults.innerHTML = '<div class="wifi-scan-msg">No networks found.</div>';
+    return;
+  }
+  // Built with textContent/closures rather than innerHTML+onclick — SSIDs
+  // come from nearby radio broadcasts (untrusted input) and could contain
+  // quote/angle-bracket characters.
+  for (const n of [...nets].sort((a, b) => b.rssi - a.rssi)) {
+    const row = document.createElement('div');
+    row.className = 'wifi-net';
+    const ssidSpan = document.createElement('span');
+    ssidSpan.className = 'wifi-net-ssid';
+    ssidSpan.textContent = n.ssid || '(hidden)';
+    const lockSpan = document.createElement('span');
+    lockSpan.className = 'wifi-net-lock';
+    lockSpan.textContent = n.open ? '' : '🔒';
+    const rssiSpan = document.createElement('span');
+    rssiSpan.className = 'wifi-net-rssi';
+    rssiSpan.textContent = n.rssi + ' dBm';
+    row.append(ssidSpan, lockSpan, rssiSpan);
+    row.addEventListener('click', () => selectWifiNet(n.ssid));
+    caddxScanResults.appendChild(row);
+  }
+}
+
+function selectWifiNet(ssid) {
+  caddxSsidInput.value = ssid;
+  caddxScanResults.innerHTML = '';
+}
 
 auxApplyBtn.addEventListener('click', async () => {
   try {

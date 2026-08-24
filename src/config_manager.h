@@ -70,6 +70,7 @@ private:
     void printAll(Stream &out);
     void handleLine(const char *line, Stream &out);
     void handleCamerasCmd(const char *sub, Stream &out);
+    void handleWifiCmd(const char *sub, Stream &out);
 
     Preferences     _prefs;
     Config          _cfg{};
