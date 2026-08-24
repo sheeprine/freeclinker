@@ -30,12 +30,16 @@ void WebConfigServer::begin(ConfigManager &cfg, CameraRegistry *reg, Stream *dbg
     _reg = reg;
     _dbg = dbg;
 
-    WiFi.softAP(WIFI_AP_SSID, strlen(WIFI_AP_PASSWORD) ? WIFI_AP_PASSWORD : nullptr,
-                WIFI_AP_CHANNEL);
+    bool ok = WiFi.softAP(WIFI_AP_SSID, strlen(WIFI_AP_PASSWORD) ? WIFI_AP_PASSWORD : nullptr,
+                          WIFI_AP_CHANNEL);
 
     if (_dbg) {
-        _dbg->printf("[wifi] AP started — SSID: %s  IP: %s\n",
-                     WIFI_AP_SSID, WiFi.softAPIP().toString().c_str());
+        if (ok) {
+            _dbg->printf("[wifi] AP started — SSID: %s  IP: %s\n",
+                         WIFI_AP_SSID, WiFi.softAPIP().toString().c_str());
+        } else {
+            _dbg->printf("[wifi] softAP() FAILED — mode=%d\n", (int)WiFi.getMode());
+        }
     }
 
     _server.on("/",            HTTP_GET,  [this]() { handleRoot();        });
@@ -120,8 +124,17 @@ void WebConfigServer::handleGetCameras() {
 // WIFI_MODE_APSTA keeps this server's own AP alive across the scan (that's
 // how the browser is even talking to us right now).
 void WebConfigServer::handleWifiScan() {
-    WiFi.mode(WIFI_MODE_APSTA);
+    if (WiFi.getMode() != WIFI_MODE_APSTA) {
+        WiFi.mode(WIFI_MODE_APSTA);
+        delay(100);  // let the STA interface come up before scanning, or
+                     // scanNetworks() can return WIFI_SCAN_FAILED
+    }
     int n = WiFi.scanNetworks();
+    if (n < 0) {  // transient WIFI_SCAN_FAILED/RUNNING — one retry usually clears it
+        delay(200);
+        n = WiFi.scanNetworks();
+    }
+    if (n < 0) n = 0;
     JsonDocument doc;
     JsonArray arr = doc.to<JsonArray>();
     for (int i = 0; i < n; i++) {

@@ -20,15 +20,20 @@ void CaddxCamera::setWifiCredentials(const char *ssid, const char *password) {
 }
 
 void CaddxCamera::begin() {
-    // Concurrent AP+STA: web_server.cpp runs the config AP via WiFi.softAP()
-    // independently of this. Explicitly requesting APSTA here means joining
-    // the camera's network never disables that AP if it happens to already
-    // be running (e.g. forced on via the BOOT button).
-    WiFi.mode(WIFI_MODE_APSTA);
     if (_ssid.length() == 0) {
         DBG_SERIAL.println("[caddx] No Wi-Fi SSID configured — set with 'set caddx_ssid'");
         return;
     }
+    // Concurrent AP+STA: web_server.cpp runs the config AP via WiFi.softAP()
+    // independently of this. Explicitly requesting APSTA here (rather than
+    // just STA) means joining the camera's network never disables that AP
+    // if it happens to already be running (e.g. forced on via the BOOT
+    // button). Only touch the mode when we're actually about to join a
+    // network — setting it unconditionally (even with no SSID) leaves the
+    // AP bit set with no SSID ever applied, and WiFi.softAP() later on
+    // no-ops its internal re-init when that bit is already set, so the
+    // config portal AP silently never starts broadcasting.
+    WiFi.mode(WIFI_MODE_APSTA);
     DBG_SERIAL.printf("[caddx] Joining Wi-Fi \"%s\"...\n", _ssid.c_str());
     WiFi.begin(_ssid.c_str(), _password.length() ? _password.c_str() : nullptr);
 }

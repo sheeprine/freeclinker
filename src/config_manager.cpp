@@ -331,9 +331,17 @@ void ConfigManager::handleCamerasCmd(const char *sub, Stream &out) {
 // alive across the scan, same coexistence mode CaddxCamera itself uses.
 void ConfigManager::handleWifiCmd(const char *sub, Stream &out) {
     if (strcmp(sub, "scan") == 0 || strlen(sub) == 0) {
-        WiFi.mode(WIFI_MODE_APSTA);
+        if (WiFi.getMode() != WIFI_MODE_APSTA) {
+            WiFi.mode(WIFI_MODE_APSTA);
+            delay(100);  // let the STA interface come up before scanning, or
+                         // scanNetworks() can return WIFI_SCAN_FAILED
+        }
         out.println("[wifi] Scanning...");
         int n = WiFi.scanNetworks();
+        if (n < 0) {  // transient WIFI_SCAN_FAILED/RUNNING — one retry usually clears it
+            delay(200);
+            n = WiFi.scanNetworks();
+        }
         if (n <= 0) {
             out.println("[wifi] No networks found");
         } else {

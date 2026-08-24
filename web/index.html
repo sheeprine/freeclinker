@@ -942,18 +942,21 @@ camClearBtn.addEventListener('click', async () => {
 });
 
 // ── Wi-Fi scan (Caddx SSID picker) ──────────────────────────────────────────────
-let collectingWifi = false;
-let wifiLines       = [];
-let wifiTimer       = null;
+let collectingWifi  = false;
+let wifiLines        = [];
+let wifiTimer        = null;
+let wifiExpectedRows = null; // set once "[wifi] N network(s) found:" arrives
 
 function startWifiCapture() {
-  collectingWifi = true;
-  wifiLines = [];
+  collectingWifi  = true;
+  wifiLines       = [];
+  wifiExpectedRows = null;
   clearTimeout(wifiTimer);
   caddxScanResults.innerHTML = '<div class="wifi-scan-msg">Scanning…</div>';
-  // Fallback: render after 4s even if the device never sent a closing line
-  // (a full scan typically takes 1-3s)
-  wifiTimer = setTimeout(finalizeWifiCapture, 4000);
+  // WiFi.scanNetworks() on the device blocks for several seconds with no
+  // output in between, so this fallback has to be generous — it's only a
+  // safety net for a malformed/missing response, not the primary signal.
+  wifiTimer = setTimeout(finalizeWifiCapture, 10000);
 }
 
 function finalizeWifiCapture() {
@@ -965,15 +968,30 @@ function finalizeWifiCapture() {
 
 function collectWifiScanLine(line) {
   if (!collectingWifi) return;
-  if (line.startsWith('[wifi]')) {
-    wifiLines.push(line);
-    // A numbered network row is the last thing we expect per scan; a
-    // "No networks found" or empty non-[wifi] line also ends it via the
-    // else-branch below. Reset the fallback timer on each arriving line.
-    clearTimeout(wifiTimer);
-    wifiTimer = setTimeout(finalizeWifiCapture, 300);
-  } else if (line.trim() && wifiLines.length > 0) {
+  if (!line.startsWith('[wifi]')) {
+    if (line.trim() && wifiLines.length > 0) finalizeWifiCapture();
+    return;
+  }
+  wifiLines.push(line);
+
+  if (/^\[wifi\] No networks found/.test(line)) {
     finalizeWifiCapture();
+    return;
+  }
+  const header = line.match(/^\[wifi\]\s+(\d+)\s+network\(s\) found:/);
+  if (header) {
+    wifiExpectedRows = parseInt(header[1]);
+    return;
+  }
+  // A numbered network row — once we've seen as many as the header
+  // promised, we know the scan is fully drained and can finalize right
+  // away instead of waiting on a fixed timeout (the "Scanning..." line
+  // that precedes all of this is followed by a multi-second gap while
+  // the blocking scan runs, so a short quiet-timer here would finalize —
+  // and stop collecting — long before the real results ever arrive).
+  if (/^\[wifi\]\s+\d+:/.test(line) && wifiExpectedRows !== null) {
+    const rows = wifiLines.filter(l => /^\[wifi\]\s+\d+:/.test(l)).length;
+    if (rows >= wifiExpectedRows) finalizeWifiCapture();
   }
 }
 
