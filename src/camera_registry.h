@@ -17,7 +17,7 @@ struct CameraEntry {
     char    name[CAMREG_NAME_LEN];  // display name seen during scan (or Caddx's own name)
     char    addr[CAMREG_ADDR_LEN];  // BLE address, or Wi-Fi SSID for Caddx entries
     uint8_t addrType;               // esp_ble_addr_type_t (0=public, 1=random); unused for Caddx
-    uint8_t cameraType;             // 0=DJI, 1=GoPro, 2=Caddx, 3=Sony
+    uint8_t cameraType;             // 0=DJI, 1=GoPro, 2=Caddx, 3=Sony, 4=Blackmagic
     char    pass[CAMREG_PASS_LEN];  // Wi-Fi password, Caddx only — never printed/exported
 };
 

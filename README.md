@@ -70,7 +70,7 @@ Runtime settings are changed via the USB serial console and persisted across reb
 
 | Command | Default | Description |
 |---------|---------|-------------|
-| `set camera_type <0\|1>` | 0 | Camera protocol: 0 = DJI, 1 = GoPro (reboot to apply) |
+| `set camera_type <0-4>` | 0 | Camera protocol: 0 = DJI, 1 = GoPro, 2 = Caddx Orca, 3 = Sony Alpha, 4 = Blackmagic (reboot to apply) |
 | `set strict_camera <0\|1>` | 0 | When 1, only connect to the preferred (last-connected) camera; ignore any other camera found during scan |
 | `set stop_on_disarm <0\|1>` | 1 | Stop recording on FC disarm |
 | `set disarm_delay <ms>` | 0 | Delay between disarm and recording stop |
@@ -169,3 +169,23 @@ set caddx_pass <password>
 Reboot after either command to apply.
 
 Just like DJI/GoPro cameras, every SSID the ESP32 successfully connects to is remembered in the camera list (`cameras list`) — configure multiple Orcas over time and switch between them with `cameras connect <idx>` (also requires a reboot, since Caddx has no live rescan to act on a selection while running).
+
+### Sony Alpha (BLE remote)
+
+Any Sony Alpha camera advertising manufacturer ID `0x012D` with device type `0x0300` (most bodies also advertise a name starting with `ILCE`). Uses Sony's undocumented BLE remote-button protocol — start/stop simulates the physical record button, so there's no explicit mode-switch command (`switchCameraMode` is unsupported).
+
+```
+set camera_type 3
+```
+
+The first connection requires bonding: open **Bluetooth Rmt Ctrl** in the camera's menu before it will pair (Just Works — no PIN to enter). Reboot after setting the camera type. Only recording state, focus, shutter, and battery are reported; no resolution/fps/stabilisation telemetry is available from this protocol.
+
+### Blackmagic (Pocket Cinema Camera, URSA, Studio range)
+
+Any Blackmagic Design camera advertising the Blackmagic Camera Service (BLE UUID `291d567a-...`). Uses the official Blackmagic Camera Control Protocol — the same one the cameras speak over SDI — re-exposed as BLE GATT characteristics.
+
+```
+set camera_type 4
+```
+
+Reboot after setting the camera type. The first connection requires pairing: the camera displays a **6-digit PIN on its own screen**, which you must type into the USB serial console when the firmware prompts for it (there's no way to automate this — the ESP32 has no display). This only happens once; the bond is remembered afterwards. Only recording start/stop is supported (`switchCameraMode` is unsupported — these cameras have no separate photo/video mode) and no battery/resolution/fps/stabilisation telemetry is exposed over BLE for this camera family.

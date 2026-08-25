@@ -188,6 +188,7 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
           <option value="1">GoPro</option>
           <option value="2">Caddx Orca</option>
           <option value="3">Sony Alpha</option>
+          <option value="4">Blackmagic</option>
         </select>
       </div>
 

@@ -17,7 +17,7 @@ public:
         bool     stopOnDisarm;       // false = never stop recording on disarm
         uint8_t  auxChannel;         // AUX channel for camera mode switch (0=disabled, 1=AUX1, …)
         uint8_t  auxMode;            // camera mode when AUX is high (0x00=slow motion)
-        uint8_t  cameraType;         // 0=DJI, 1=GoPro, 2=Caddx
+        uint8_t  cameraType;         // 0=DJI, 1=GoPro, 2=Caddx, 3=Sony, 4=Blackmagic
         bool     strictCamera;       // true = never connect to a camera other than the preferred one
         bool     debugBle;           // true = log raw BLE TX/RX packets to the serial console
         // OSD custom message templates — tokens: {bat} {rec} {mode} {res} {fps} {eis} {rleft} {rcap}

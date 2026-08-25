@@ -10,6 +10,8 @@ static const char *cameraTypeName(uint8_t t) {
     switch (t) {
         case 1:  return "GoPro";
         case 2:  return "Caddx";
+        case 3:  return "Sony";
+        case 4:  return "Blackmagic";
         default: return "DJI";
     }
 }

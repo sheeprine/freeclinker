@@ -65,6 +65,7 @@ static const char *cameraTypeName(uint8_t t) {
         case 1:  return "GoPro";
         case 2:  return "Caddx";
         case 3:  return "Sony";
+        case 4:  return "Blackmagic";
         default: return "DJI";
     }
 }
@@ -104,7 +105,7 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         out.println("Commands:");
         out.println("  version                    - print firmware version");
         out.println("  show                       - print all settings");
-        out.println("  set camera_type <0-3>      - 0=DJI, 1=GoPro, 2=Caddx Orca, 3=Sony Alpha (reboot required)");
+        out.println("  set camera_type <0-4>      - 0=DJI, 1=GoPro, 2=Caddx Orca, 3=Sony Alpha, 4=Blackmagic (reboot required)");
         out.println("  set strict_camera <0|1>    - 1=only connect to preferred camera, skip unknown ones");
         out.println("  set disarm_delay <ms>      - delay before stopping recording after disarm");
         out.println("  set stop_on_disarm <0|1>   - disable (0) or enable (1) stop on disarm");
@@ -205,8 +206,8 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
             const char *val = rest + 12;
             while (*val == ' ') val++;
             uint8_t t = static_cast<uint8_t>(strtoul(val, nullptr, 10));
-            if (t > 3) {
-                out.println("[cfg] camera_type must be 0 (DJI), 1 (GoPro), 2 (Caddx), or 3 (Sony)");
+            if (t > 4) {
+                out.println("[cfg] camera_type must be 0 (DJI), 1 (GoPro), 2 (Caddx), 3 (Sony), or 4 (Blackmagic)");
                 return;
             }
             setCameraType(t);
