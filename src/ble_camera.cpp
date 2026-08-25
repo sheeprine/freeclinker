@@ -482,10 +482,23 @@ void BLECamera::handleConnectResponse(const uint8_t *payload, uint16_t len) {
 // Step 5 of handshake: camera sends its own connect request (cmd_type 0x02 = CMD).
 // We must ACK with the same seq number, then subscribe to status.
 // NOTE: called from inside the BLE notify callback — defer the BLE write to update().
-void BLECamera::handleConnectCommand(uint16_t camSeq, const uint8_t * /*payload*/,
-                                      uint16_t /*len*/) {
+void BLECamera::handleConnectCommand(uint16_t camSeq, const uint8_t *payload,
+                                      uint16_t len) {
     if (_djiConnected || _pendingConnectAck) return;   // already handled
-    DBG_SERIAL.printf("[DJI] Camera hello (seq=0x%04X) — queuing ACK\n", camSeq);
+
+    // The camera's hello carries its own device_id (bytes 0-3, LE) — per DJI's
+    // published protocol_data_segment.md this identifies the model (e.g. 0xFF33
+    // Action 4, 0xFF44 Action 5 Pro, 0xFF55 Action 6, 0xFF66 Osmo 360). Older
+    // models like Action 2 aren't in that published table, so log it here to
+    // identify what an untested camera reports rather than guessing.
+    if (len >= 4) {
+        uint32_t camDeviceId = (uint32_t)payload[0] | ((uint32_t)payload[1] << 8) |
+                               ((uint32_t)payload[2] << 16) | ((uint32_t)payload[3] << 24);
+        DBG_SERIAL.printf("[DJI] Camera hello (seq=0x%04X) device_id=0x%08X — queuing ACK\n",
+                          camSeq, camDeviceId);
+    } else {
+        DBG_SERIAL.printf("[DJI] Camera hello (seq=0x%04X) — queuing ACK\n", camSeq);
+    }
     _pendingAckSeq     = camSeq;
     _pendingConnectAck = true;
 }
@@ -521,37 +534,37 @@ void BLECamera::handleCameraStatus(const uint8_t *payload, uint16_t len) {
     // DJI eis_mode byte (0-4) maps directly to CAM_EIS_OFF..CAM_EIS_HB.
     _camera.eis_mode = s->eis_mode;  // 0=off, 1=RS, 2=HS, 3=RS+, 4=HB
 
-    // Map DJI video_resolution index to common CAM_RES_* codes.
-    // Indices are ordered by increasing resolution on DJI Action cameras.
-    static const uint8_t dji_res_map[] = {
-        CAM_RES_480P,    // 0
-        CAM_RES_720P,    // 1
-        CAM_RES_1080P,   // 2
-        CAM_RES_2_7K,    // 3
-        CAM_RES_4K,      // 4
-        CAM_RES_4K_WIDE, // 5  (4:3 / SuperView)
-        CAM_RES_5_1K,    // 6
-        CAM_RES_5_3K,    // 7
-    };
-    _camera.resolution = (s->video_resolution < sizeof(dji_res_map))
-                       ? dji_res_map[s->video_resolution] : CAM_RES_UNKNOWN;
+    // video_resolution is a sparse code, not a sequential index — values per
+    // DJI's official protocol_data_segment.md (dji-sdk/Osmo-GPS-Controller-Demo).
+    // Photo-mode sizes (3/4) collide with video codes and aren't distinguished here.
+    switch (s->video_resolution) {
+        case 10:  _camera.resolution = CAM_RES_1080P;   break;  // 1080P
+        case 66:  _camera.resolution = CAM_RES_1080P;   break;  // 1080P 9:16
+        case 16:  _camera.resolution = CAM_RES_4K;       break;  // 4K 16:9
+        case 109: _camera.resolution = CAM_RES_4K;       break;  // 4K 9:16
+        case 103: _camera.resolution = CAM_RES_4K_WIDE;  break;  // 4K 4:3
+        case 45:  _camera.resolution = CAM_RES_2_7K;     break;  // 2.7K 16:9
+        case 67:  _camera.resolution = CAM_RES_2_7K;     break;  // 2.7K 9:16
+        case 95:  _camera.resolution = CAM_RES_2_7K;     break;  // 2.7K 4:3
+        default:  _camera.resolution = CAM_RES_UNKNOWN;  break;
+    }
 
-    // Map DJI fps_idx to common CAM_FPS_* codes.
-    // Order mirrors DJI Action camera FPS options (ascending index = ascending fps).
-    static const uint8_t dji_fps_map[] = {
-        CAM_FPS_24,   // 0
-        CAM_FPS_25,   // 1
-        CAM_FPS_30,   // 2
-        CAM_FPS_48,   // 3
-        CAM_FPS_50,   // 4
-        CAM_FPS_60,   // 5
-        CAM_FPS_100,  // 6
-        CAM_FPS_120,  // 7
-        CAM_FPS_200,  // 8
-        CAM_FPS_240,  // 9
-    };
-    _camera.fps_idx = (s->fps_idx < sizeof(dji_fps_map))
-                    ? dji_fps_map[s->fps_idx] : CAM_FPS_UNKNOWN;
+    // fps_idx is likewise a sparse code (same source). In Slow Motion mode it's
+    // actually a multiplier and in Photo mode a burst count — not handled here,
+    // matching this function's pre-existing scope of video fps only.
+    switch (s->fps_idx) {
+        case 1:  _camera.fps_idx = CAM_FPS_24;  break;
+        case 2:  _camera.fps_idx = CAM_FPS_25;  break;
+        case 3:  _camera.fps_idx = CAM_FPS_30;  break;
+        case 4:  _camera.fps_idx = CAM_FPS_48;  break;
+        case 5:  _camera.fps_idx = CAM_FPS_50;  break;
+        case 6:  _camera.fps_idx = CAM_FPS_60;  break;
+        case 7:  _camera.fps_idx = CAM_FPS_120; break;
+        case 8:  _camera.fps_idx = CAM_FPS_240; break;
+        case 10: _camera.fps_idx = CAM_FPS_100; break;
+        case 19: _camera.fps_idx = CAM_FPS_200; break;
+        default: _camera.fps_idx = CAM_FPS_UNKNOWN; break;
+    }
 
     _camera.valid = true;
 
