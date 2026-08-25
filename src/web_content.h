@@ -192,6 +192,31 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
         </select>
       </div>
 
+      <!-- Camera matching mode -->
+      <div class="cfg-field">
+        <div class="cfg-field-text">
+          <div class="cfg-field-name">Camera matching</div>
+          <div class="cfg-field-desc">How to pick a camera when the preferred (last-connected) one isn't the only one found during scan.</div>
+        </div>
+        <select id="cameraMatch">
+          <option value="0">Fallback to any camera</option>
+          <option value="1">Strict — preferred only</option>
+          <option value="2">Strongest signal</option>
+        </select>
+      </div>
+
+      <!-- Wake guard -->
+      <div class="cfg-field">
+        <div class="cfg-field-text">
+          <div class="cfg-field-name">Prevent camera wake-up</div>
+          <div class="cfg-field-desc">GoPro only. Don't connect to a camera whose advertisement shows it's asleep/powered-down — a BLE connection attempt would otherwise wake it. A manually selected camera below still connects regardless.</div>
+        </div>
+        <label class="switch" title="Prevent camera wake-up">
+          <input type="checkbox" id="wakeGuard" checked>
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+
       <!-- Stop on disarm -->
       <div class="cfg-field">
         <div class="cfg-field-text">
@@ -321,6 +346,55 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
       </div>
     </div>
 
+    <!-- BF4.5 Compatibility card -->
+    <div class="config-card" style="margin-top:16px;">
+      <div class="card-header">
+        <h2>Betaflight 4.5 Compatibility</h2>
+      </div>
+
+      <div class="cfg-field">
+        <div class="cfg-field-text">
+          <div class="cfg-field-name">BF4.5 mode</div>
+          <div class="cfg-field-desc">Betaflight 4.5 has no Custom Message 1-4 OSD fields. When on, the OSD Templates above stop being sent and Pilot Name / Craft Name are used instead.</div>
+        </div>
+        <label class="switch" title="BF4.5 mode">
+          <input type="checkbox" id="bf45Compat">
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+
+      <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
+        <div class="cfg-field-name">Pilot Name</div>
+        <div class="cfg-field-desc">Default: battery percentage. Sent only when BF4.5 mode is on.</div>
+        <input class="tpl-input" id="pilotTpl" type="text" maxlength="31" spellcheck="false">
+      </div>
+
+      <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
+        <div class="cfg-field-name">Craft Name</div>
+        <div class="cfg-field-desc">Default: recording state / elapsed time. Sent only when BF4.5 mode is on.</div>
+        <input class="tpl-input" id="craftTpl" type="text" maxlength="31" spellcheck="false">
+      </div>
+
+      <div class="cfg-field" style="border-bottom:none;padding-top:4px;">
+        <div class="token-ref">
+          Available tokens:
+          <code>{bat}</code> battery % &nbsp;·&nbsp;
+          <code>{rec}</code> recording state &nbsp;·&nbsp;
+          <code>{mode}</code> camera mode &nbsp;·&nbsp;
+          <code>{res}</code> resolution &nbsp;·&nbsp;
+          <code>{fps}</code> frame rate &nbsp;·&nbsp;
+          <code>{eis}</code> stabilization &nbsp;·&nbsp;
+          <code>{rleft}</code> SD time left &nbsp;·&nbsp;
+          <code>{rcap}</code> SD space left
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <span class="saved-msg" id="bf45SavedMsg"></span>
+        <button id="bf45ApplyBtn" class="primary">Apply</button>
+      </div>
+    </div>
+
   </div><!-- /panel-config -->
 
   <!-- Cameras -->
@@ -395,6 +469,13 @@ const osd1Input    = document.getElementById('osd1');
 const osd2Input    = document.getElementById('osd2');
 const osd3Input    = document.getElementById('osd3');
 const osd4Input    = document.getElementById('osd4');
+const cameraMatchSel = document.getElementById('cameraMatch');
+const wakeGuardToggle = document.getElementById('wakeGuard');
+const bf45ApplyBtn = document.getElementById('bf45ApplyBtn');
+const bf45SavedMsg = document.getElementById('bf45SavedMsg');
+const bf45CompatToggle = document.getElementById('bf45Compat');
+const pilotTplInput = document.getElementById('pilotTpl');
+const craftTplInput = document.getElementById('craftTpl');
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 let activeTab = 'config';
@@ -437,10 +518,15 @@ async function loadConfig() {
     delayInput.value     = j.disarm_delay  ?? 0;
     auxChannelSel.value  = j.aux_channel   ?? 0;
     auxModeSel.value     = j.aux_mode      ?? 0;
+    cameraMatchSel.value = j.camera_match  ?? 0;
+    wakeGuardToggle.checked = j.wake_guard ?? true;
     osd1Input.value      = j.osd1 ?? '';
     osd2Input.value      = j.osd2 ?? '';
     osd3Input.value      = j.osd3 ?? '';
     osd4Input.value      = j.osd4 ?? '';
+    bf45CompatToggle.checked = j.bf45_compat ?? false;
+    pilotTplInput.value  = j.pilot_tpl ?? '';
+    craftTplInput.value  = j.craft_tpl ?? '';
     updateDelayEquiv();
     updateAuxModeState();
     updateCameraTypeState();
@@ -512,6 +598,8 @@ applyBtn.addEventListener('click', async () => {
   try {
     const data = {
       camera_type:    parseInt(cameraTypeSel.value),
+      camera_match:   parseInt(cameraMatchSel.value),
+      wake_guard:     wakeGuardToggle.checked,
       stop_on_disarm: stopToggle.checked,
       disarm_delay:   parseInt(delayInput.value) || 0
     };
@@ -606,6 +694,17 @@ osdApplyBtn.addEventListener('click', async () => {
       osd4: osd4Input.value
     });
     flashSaved(osdSavedMsg);
+  } catch (e) { console.error(e); }
+});
+
+bf45ApplyBtn.addEventListener('click', async () => {
+  try {
+    await saveConfig({
+      bf45_compat: bf45CompatToggle.checked,
+      pilot_tpl:   pilotTplInput.value,
+      craft_tpl:   craftTplInput.value
+    });
+    flashSaved(bf45SavedMsg);
   } catch (e) { console.error(e); }
 });
 
