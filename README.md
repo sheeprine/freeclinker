@@ -30,6 +30,8 @@ DJI Action / GoPro Camera ←—BLE—→ ESP32 ←—MSP Serial—→ Betafligh
 
 All four custom messages are user-configurable templates (see `set osd1`–`osd4` below).
 
+**Betaflight 4.5**: the Custom Message 1-4 OSD fields were added in BF4.6 and don't exist on 4.5. Enable `bf45_compat` to send telemetry through the Pilot Name and Craft Name fields instead, which BF4.5 does have (see `set bf45_compat`/`pilot_tpl`/`craft_tpl` below).
+
 ## Hardware setup
 
 Connect the ESP32 to a free Betaflight FC UART. Pin numbers differ by board:
@@ -80,6 +82,9 @@ Runtime settings are changed via the USB serial console and persisted across reb
 | `set osd2 <template>` | `{rec}` | OSD Custom Message 2 template |
 | `set osd3 <template>` | `{mode} {res}/{fps} {eis}` | OSD Custom Message 3 template |
 | `set osd4 <template>` | `{rleft} {rcap}` | OSD Custom Message 4 template |
+| `set bf45_compat <0\|1>` | 0 | Betaflight 4.5 has no Custom Message 1-4 OSD fields. When 1, `osd1`–`osd4` above stop being sent and `pilot_tpl`/`craft_tpl` are sent to Pilot Name/Craft Name instead |
+| `set pilot_tpl <template>` | `CAM:{bat}` | Pilot Name template — sent only when `bf45_compat=1` |
+| `set craft_tpl <template>` | `{rec}` | Craft Name template — sent only when `bf45_compat=1` |
 
 OSD template tokens: `{bat}` battery %, `{rec}` recording state, `{mode}` camera mode, `{res}` resolution, `{fps}` frame rate, `{eis}` stabilisation, `{rleft}` SD time remaining, `{rcap}` SD space remaining.
 

@@ -260,10 +260,17 @@ void loop() {
         hasCamera  = false;
         const auto &cfg = configManager.config();
         mspSerial.sendCameraStatus(currentCamera);
-        mspSerial.sendCustomOSD1(currentCamera, cfg.osd1Tpl);
-        mspSerial.sendCustomOSD2(currentCamera, cfg.osd2Tpl);
-        mspSerial.sendCustomOSD3(currentCamera, cfg.osd3Tpl);
-        mspSerial.sendCustomOSD4(currentCamera, cfg.osd4Tpl);
+        if (cfg.bf45Compat) {
+            // Betaflight 4.5 has no Custom Message 1-4 OSD fields — sending
+            // them would just be ignored, so use Pilot Name/Craft Name instead.
+            mspSerial.sendPilotName(currentCamera, cfg.pilotNameTpl);
+            mspSerial.sendCraftName(currentCamera, cfg.craftNameTpl);
+        } else {
+            mspSerial.sendCustomOSD1(currentCamera, cfg.osd1Tpl);
+            mspSerial.sendCustomOSD2(currentCamera, cfg.osd2Tpl);
+            mspSerial.sendCustomOSD3(currentCamera, cfg.osd3Tpl);
+            mspSerial.sendCustomOSD4(currentCamera, cfg.osd4Tpl);
+        }
         lastBattMs = now;
 
         DBG_SERIAL.printf("[cam] bat=%u%%  mode=0x%02X  rec=%s  eis=%u  "

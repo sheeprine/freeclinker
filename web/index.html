@@ -491,6 +491,55 @@
         <button id="osdApplyBtn" class="primary" disabled>Apply</button>
       </div>
     </div>
+
+    <!-- BF4.5 Compatibility card -->
+    <div class="config-card" style="margin-top: 16px;">
+      <div class="card-header">
+        <h2>Betaflight 4.5 Compatibility</h2>
+      </div>
+
+      <div class="cfg-field">
+        <div class="cfg-field-text">
+          <div class="cfg-field-name">BF4.5 mode</div>
+          <div class="cfg-field-desc">Betaflight 4.5 has no Custom Message 1-4 OSD fields. When on, the OSD Templates above stop being sent and Pilot Name / Craft Name are used instead.</div>
+        </div>
+        <label class="switch" title="BF4.5 mode">
+          <input type="checkbox" id="bf45Compat" disabled>
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+
+      <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
+        <div class="cfg-field-name">Pilot Name</div>
+        <div class="cfg-field-desc">Default: battery percentage. Sent only when BF4.5 mode is on.</div>
+        <input class="tpl-input" id="pilotTpl" type="text" maxlength="31" spellcheck="false" disabled>
+      </div>
+
+      <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
+        <div class="cfg-field-name">Craft Name</div>
+        <div class="cfg-field-desc">Default: recording state / elapsed time. Sent only when BF4.5 mode is on.</div>
+        <input class="tpl-input" id="craftTpl" type="text" maxlength="31" spellcheck="false" disabled>
+      </div>
+
+      <div class="cfg-field" style="border-bottom:none;padding-top:4px;">
+        <div class="token-ref">
+          Available tokens:
+          <code>{bat}</code> battery % &nbsp;·&nbsp;
+          <code>{rec}</code> recording state &nbsp;·&nbsp;
+          <code>{mode}</code> camera mode &nbsp;·&nbsp;
+          <code>{res}</code> resolution &nbsp;·&nbsp;
+          <code>{fps}</code> frame rate &nbsp;·&nbsp;
+          <code>{eis}</code> stabilization &nbsp;·&nbsp;
+          <code>{rleft}</code> SD time left &nbsp;·&nbsp;
+          <code>{rcap}</code> SD space left
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <span class="saved-msg" id="bf45SavedMsg"></span>
+        <button id="bf45ApplyBtn" class="primary" disabled>Apply</button>
+      </div>
+    </div>
   </div>
 
   <!-- Cameras -->
@@ -580,6 +629,11 @@ const osd3Input      = document.getElementById('osd3');
 const osd4Input      = document.getElementById('osd4');
 const osdApplyBtn    = document.getElementById('osdApplyBtn');
 const osdSavedMsg    = document.getElementById('osdSavedMsg');
+const bf45CompatToggle = document.getElementById('bf45Compat');
+const pilotTplInput   = document.getElementById('pilotTpl');
+const craftTplInput   = document.getElementById('craftTpl');
+const bf45ApplyBtn    = document.getElementById('bf45ApplyBtn');
+const bf45SavedMsg    = document.getElementById('bf45SavedMsg');
 const camTableWrap   = document.getElementById('camTableWrap');
 const camRefreshBtn  = document.getElementById('camRefreshBtn');
 const camClearBtn    = document.getElementById('camClearBtn');
@@ -671,6 +725,10 @@ function parseConfigLine(line) {
   } else if (key === 'osd2') { osd2Input.value = val;
   } else if (key === 'osd3') { osd3Input.value = val;
   } else if (key === 'osd4') { osd4Input.value = val;
+  } else if (key === 'bf45_compat') {
+    bf45CompatToggle.checked = (val === 'true');
+  } else if (key === 'pilot_tpl') { pilotTplInput.value = val;
+  } else if (key === 'craft_tpl') { craftTplInput.value = val;
   }
 }
 
@@ -835,6 +893,14 @@ osdApplyBtn.addEventListener('click', async () => {
   await sendCommand(`set osd3 ${osd3Input.value}`);
   await sendCommand(`set osd4 ${osd4Input.value}`);
   flashSaved(osdSavedMsg);
+});
+
+bf45ApplyBtn.addEventListener('click', async () => {
+  const bf45 = bf45CompatToggle.checked ? 1 : 0;
+  await sendCommand(`set bf45_compat ${bf45}`);
+  await sendCommand(`set pilot_tpl ${pilotTplInput.value}`);
+  await sendCommand(`set craft_tpl ${craftTplInput.value}`);
+  flashSaved(bf45SavedMsg);
 });
 
 auxChannelSel.addEventListener('change', updateAuxModeState);
@@ -1091,6 +1157,10 @@ function setConnected(connected) {
   osd3Input.disabled     = !connected;
   osd4Input.disabled     = !connected;
   osdApplyBtn.disabled   = !connected;
+  bf45CompatToggle.disabled = !connected;
+  pilotTplInput.disabled    = !connected;
+  craftTplInput.disabled    = !connected;
+  bf45ApplyBtn.disabled     = !connected;
   camRefreshBtn.disabled = !connected;
   camClearBtn.disabled   = !connected;
   updateAuxModeState();

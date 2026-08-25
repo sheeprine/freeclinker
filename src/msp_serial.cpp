@@ -299,6 +299,9 @@ void MSPSerial::sendCustomOSD2(const CameraData &data, const char *tpl) { sendCu
 void MSPSerial::sendCustomOSD3(const CameraData &data, const char *tpl) { sendCustomOSD(MSP_TEXT_CUSTOM_3, data, tpl); }
 void MSPSerial::sendCustomOSD4(const CameraData &data, const char *tpl) { sendCustomOSD(MSP_TEXT_CUSTOM_4, data, tpl); }
 
+void MSPSerial::sendPilotName(const CameraData &data, const char *tpl) { sendCustomOSD(MSP_TEXT_PILOT_NAME, data, tpl); }
+void MSPSerial::sendCraftName(const CameraData &data, const char *tpl) { sendCustomOSD(MSP_TEXT_CRAFT_NAME, data, tpl); }
+
 void MSPSerial::sendCustomOSD(uint8_t textType, const CameraData &data, const char *tpl) {
     char text[17] = {};
     expandTemplate(tpl, data, text, sizeof(text));

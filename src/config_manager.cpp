@@ -18,6 +18,9 @@ static constexpr const char *KEY_OSD3 = "osd3_tpl";
 static constexpr const char *KEY_OSD4 = "osd4_tpl";
 static constexpr const char *KEY_SCM  = "strict_cam";
 static constexpr const char *KEY_DBG  = "debug_ble";
+static constexpr const char *KEY_BF45  = "bf45_compat";
+static constexpr const char *KEY_PILOT = "pilot_tpl";
+static constexpr const char *KEY_CRAFT = "craft_tpl";
 
 void ConfigManager::begin(Stream &serial) {
     _serial = &serial;
@@ -44,6 +47,9 @@ void ConfigManager::load() {
     loadStr(_prefs, KEY_OSD2, _cfg.osd2Tpl, sizeof(_cfg.osd2Tpl), DEFAULT_OSD2_TPL);
     loadStr(_prefs, KEY_OSD3, _cfg.osd3Tpl, sizeof(_cfg.osd3Tpl), DEFAULT_OSD3_TPL);
     loadStr(_prefs, KEY_OSD4, _cfg.osd4Tpl, sizeof(_cfg.osd4Tpl), DEFAULT_OSD4_TPL);
+    _cfg.bf45Compat        = _prefs.getBool(KEY_BF45, DEFAULT_BF45_COMPAT);
+    loadStr(_prefs, KEY_PILOT, _cfg.pilotNameTpl, sizeof(_cfg.pilotNameTpl), DEFAULT_PILOT_NAME_TPL);
+    loadStr(_prefs, KEY_CRAFT, _cfg.craftNameTpl, sizeof(_cfg.craftNameTpl), DEFAULT_CRAFT_NAME_TPL);
 }
 
 void ConfigManager::save() {
@@ -58,6 +64,9 @@ void ConfigManager::save() {
     _prefs.putString(KEY_OSD2, _cfg.osd2Tpl);
     _prefs.putString(KEY_OSD3, _cfg.osd3Tpl);
     _prefs.putString(KEY_OSD4, _cfg.osd4Tpl);
+    _prefs.putBool(KEY_BF45, _cfg.bf45Compat);
+    _prefs.putString(KEY_PILOT, _cfg.pilotNameTpl);
+    _prefs.putString(KEY_CRAFT, _cfg.craftNameTpl);
 }
 
 static const char *cameraTypeName(uint8_t t) {
@@ -85,6 +94,9 @@ void ConfigManager::printAll(Stream &out) {
     out.printf("[cfg] osd2            = %s\n", _cfg.osd2Tpl);
     out.printf("[cfg] osd3            = %s\n", _cfg.osd3Tpl);
     out.printf("[cfg] osd4            = %s\n", _cfg.osd4Tpl);
+    out.printf("[cfg] bf45_compat     = %s\n", _cfg.bf45Compat ? "true" : "false");
+    out.printf("[cfg] pilot_tpl       = %s\n", _cfg.pilotNameTpl);
+    out.printf("[cfg] craft_tpl       = %s\n", _cfg.craftNameTpl);
 
     CameraEntry ce;
     bool haveCaddx = _registry && _registry->preferredEntry(/*Caddx=*/2, ce);
@@ -117,6 +129,9 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         out.println("  set osd3 <template>        - OSD Custom Message 3 template (default: settings)");
         out.println("  set osd4 <template>        - OSD Custom Message 4 template (default: storage)");
         out.println("  Tokens: {bat} {rec} {mode} {res} {fps} {eis} {rleft} {rcap}");
+        out.println("  set bf45_compat <0|1>      - 1=target Betaflight 4.5: send pilot_tpl/craft_tpl to Pilot Name/Craft Name, stop sending osd1-4 (no Custom Message fields on 4.5)");
+        out.println("  set pilot_tpl <template>   - Pilot Name template, used only when bf45_compat=1 (default: battery)");
+        out.println("  set craft_tpl <template>   - Craft Name template, used only when bf45_compat=1 (default: recording state)");
         out.println("  set caddx_ssid <ssid>      - remember + select a Caddx Orca's Wi-Fi network (camera_type=2)");
         out.println("  set caddx_pass <password>  - password for the SSID above (tries factory default 12345678 first; reboot required)");
         out.println("  reset                      - restore defaults");
@@ -292,6 +307,26 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         if (strncmp(rest, "osd4 ", 5) == 0) {
             setOsdTemplate(4, rest + 5);
             out.printf("[cfg] osd4 = %s (saved)\n", _cfg.osd4Tpl);
+            return;
+        }
+
+        if (strncmp(rest, "bf45_compat ", 12) == 0) {
+            const char *val = rest + 12;
+            while (*val == ' ') val++;
+            setBf45Compat(strtoul(val, nullptr, 10) != 0);
+            out.printf("[cfg] bf45_compat = %s (saved)\n", _cfg.bf45Compat ? "true" : "false");
+            return;
+        }
+
+        if (strncmp(rest, "pilot_tpl ", 10) == 0) {
+            setPilotNameTemplate(rest + 10);
+            out.printf("[cfg] pilot_tpl = %s (saved)\n", _cfg.pilotNameTpl);
+            return;
+        }
+
+        if (strncmp(rest, "craft_tpl ", 10) == 0) {
+            setCraftNameTemplate(rest + 10);
+            out.printf("[cfg] craft_tpl = %s (saved)\n", _cfg.craftNameTpl);
             return;
         }
 
@@ -493,6 +528,21 @@ void ConfigManager::setOsdTemplate(uint8_t n, const char *tpl) {
     }
     strlcpy(dst, tpl, OSD_TPL_LEN);
     _prefs.putString(key, dst);
+}
+
+void ConfigManager::setBf45Compat(bool v) {
+    _cfg.bf45Compat = v;
+    _prefs.putBool(KEY_BF45, v);
+}
+
+void ConfigManager::setPilotNameTemplate(const char *tpl) {
+    strlcpy(_cfg.pilotNameTpl, tpl, OSD_TPL_LEN);
+    _prefs.putString(KEY_PILOT, _cfg.pilotNameTpl);
+}
+
+void ConfigManager::setCraftNameTemplate(const char *tpl) {
+    strlcpy(_cfg.craftNameTpl, tpl, OSD_TPL_LEN);
+    _prefs.putString(KEY_CRAFT, _cfg.craftNameTpl);
 }
 
 bool ConfigManager::setCaddxSsid(const char *ssid) {

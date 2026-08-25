@@ -12,6 +12,8 @@
 #define MSP2_SET_TEXT               0x3007
 
 // Text type values for MSP2_SET_TEXT / MSP2_GET_TEXT
+#define MSP_TEXT_PILOT_NAME         1   // Pilot Name field — present since BF4.5, unlike Custom Message 1-4
+#define MSP_TEXT_CRAFT_NAME         2   // Craft Name field — present since BF4.5, unlike Custom Message 1-4
 #define MSP_TEXT_CUSTOM_1           7   // "Custom Message 1" OSD field
 #define MSP_TEXT_CUSTOM_2           8   // "Custom Message 2" OSD field
 #define MSP_TEXT_CUSTOM_3           9   // "Custom Message 3" OSD field
@@ -64,6 +66,13 @@ public:
     void sendCustomOSD2(const CameraData &data, const char *tpl);
     void sendCustomOSD3(const CameraData &data, const char *tpl);
     void sendCustomOSD4(const CameraData &data, const char *tpl);
+
+    // BF4.5 compatibility: Betaflight 4.5 has the Pilot Name and Craft Name
+    // fields but not the Custom Message 1-4 fields (added in 4.6). Expand
+    // `tpl` the same way as sendCustomOSD1-4 but write it into those fields
+    // instead.
+    void sendPilotName(const CameraData &data, const char *tpl);
+    void sendCraftName(const CameraData &data, const char *tpl);
 
     bool isArmed() const { return _armed; }
     void setArmCallback(ArmCallback cb) { _armCb = cb; }
