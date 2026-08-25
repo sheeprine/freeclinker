@@ -1,6 +1,6 @@
 #pragma once
 
-#define FIRMWARE_VERSION "0.0.6"
+#define FIRMWARE_VERSION "0.0.7"
 
 // ─── BLE ─────────────────────────────────────────────────────────────────────
 
