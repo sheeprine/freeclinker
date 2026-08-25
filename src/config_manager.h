@@ -18,7 +18,8 @@ public:
         uint8_t  auxChannel;         // AUX channel for camera mode switch (0=disabled, 1=AUX1, …)
         uint8_t  auxMode;            // camera mode when AUX is high (0x00=slow motion)
         uint8_t  cameraType;         // 0=DJI, 1=GoPro, 2=Caddx, 3=Sony, 4=Blackmagic
-        bool     strictCamera;       // true = never connect to a camera other than the preferred one
+        uint8_t  cameraMatchMode;    // CAM_MATCH_* — see camera.h
+        bool     cameraWakeGuard;    // true = don't connect to a sleeping/powered-down GoPro (see camera.h setWakeGuard)
         bool     debugBle;           // true = log raw BLE TX/RX packets to the serial console
         // OSD custom message templates — tokens: {bat} {rec} {mode} {res} {fps} {eis} {rleft} {rcap}
         char osd1Tpl[OSD_TPL_LEN];  // Custom Message 1 (default: battery)
@@ -42,7 +43,8 @@ public:
     static constexpr uint8_t  DEFAULT_AUX_CHANNEL          = 0;
     static constexpr uint8_t  DEFAULT_AUX_MODE             = 0x00;  // slow motion
     static constexpr uint8_t  DEFAULT_CAMERA_TYPE          = 0;     // DJI
-    static constexpr bool     DEFAULT_STRICT_CAMERA        = false;
+    static constexpr uint8_t  DEFAULT_CAMERA_MATCH_MODE    = 0;     // CAM_MATCH_FALLBACK
+    static constexpr bool     DEFAULT_CAMERA_WAKE_GUARD    = true;
     static constexpr bool     DEFAULT_DEBUG_BLE            = false;
     static constexpr const char *DEFAULT_OSD1_TPL = "CAM:{bat}";
     static constexpr const char *DEFAULT_OSD2_TPL = "{rec}";
@@ -70,7 +72,8 @@ public:
     void setStopOnDisarm(bool v);
     void setAuxChannel(uint8_t ch);
     void setAuxMode(uint8_t mode);
-    void setStrictCamera(bool v);
+    void setCameraMatchMode(uint8_t v);
+    void setCameraWakeGuard(bool v);
     void setDebugBle(bool v);
     void setOsdTemplate(uint8_t n, const char *tpl);  // n = 1..4
     void setBf45Compat(bool v);

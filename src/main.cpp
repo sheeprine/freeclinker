@@ -148,7 +148,7 @@ void setup() {
     mspSerial.setArmCallback(onArmStateChange);
     mspSerial.setAuxSwitchCallback(onAuxSwitch);
 
-    // Caddx has no BLE scan/pairing flow or strict-camera fallback logic —
+    // Caddx has no BLE scan/pairing flow or camera-match-mode fallback logic —
     // it just joins a Wi-Fi network directly — but it does still use the
     // registry, to remember multiple Orcas by SSID/password and read
     // whichever is preferred at begin() (see caddx_camera.h).
@@ -158,11 +158,19 @@ void setup() {
     sonyCamera.setRegistry(&cameraRegistry);
     blackmagicCamera.setRegistry(&cameraRegistry);
 
-    const bool strict = configManager.config().strictCamera;
-    djiCamera.setStrictCamera(strict);
-    goProCamera.setStrictCamera(strict);
-    sonyCamera.setStrictCamera(strict);
-    blackmagicCamera.setStrictCamera(strict);
+    const uint8_t matchMode = configManager.config().cameraMatchMode;
+    djiCamera.setMatchMode(matchMode);
+    goProCamera.setMatchMode(matchMode);
+    sonyCamera.setMatchMode(matchMode);
+    blackmagicCamera.setMatchMode(matchMode);
+
+    // Wake guard only affects GoPro (the only backend with a known
+    // sleep/awake advertisement format), but it's harmless to set on all.
+    const bool wakeGuard = configManager.config().cameraWakeGuard;
+    djiCamera.setWakeGuard(wakeGuard);
+    goProCamera.setWakeGuard(wakeGuard);
+    sonyCamera.setWakeGuard(wakeGuard);
+    blackmagicCamera.setWakeGuard(wakeGuard);
 
     const bool debugBle = configManager.config().debugBle;
     djiCamera.setDebugBle(debugBle);

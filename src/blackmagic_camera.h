@@ -98,6 +98,12 @@ private:
     std::string          _candidateName;
     esp_ble_addr_type_t  _candidateType = BLE_ADDR_TYPE_PUBLIC;
 
+    // CAM_MATCH_BEST_SIGNAL: strongest-RSSI camera seen so far this scan
+    std::string          _bestAddr;
+    std::string          _bestName;
+    esp_ble_addr_type_t  _bestType = BLE_ADDR_TYPE_PUBLIC;
+    int8_t               _bestRssi = -128;
+
     CameraData _camera{};
 
     static BlackmagicCamera *_instance;

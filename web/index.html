@@ -339,14 +339,27 @@
         </select>
       </div>
 
-      <!-- Strict camera -->
+      <!-- Camera matching mode -->
       <div class="cfg-field">
         <div class="cfg-field-text">
-          <div class="cfg-field-name">Strict camera matching</div>
-          <div class="cfg-field-desc">When on, only connect to the preferred camera. Skip any other camera found during scan.</div>
+          <div class="cfg-field-name">Camera matching</div>
+          <div class="cfg-field-desc">How to pick a camera when the preferred (last-connected) one isn't the only one found during scan.</div>
         </div>
-        <label class="switch" title="Strict camera matching">
-          <input type="checkbox" id="strictCamera" disabled>
+        <select id="cameraMatch" disabled>
+          <option value="0">Fallback to any camera</option>
+          <option value="1">Strict — preferred only</option>
+          <option value="2">Strongest signal</option>
+        </select>
+      </div>
+
+      <!-- Wake guard -->
+      <div class="cfg-field">
+        <div class="cfg-field-text">
+          <div class="cfg-field-name">Prevent camera wake-up</div>
+          <div class="cfg-field-desc">GoPro only. Don't connect to a camera whose advertisement shows it's asleep/powered-down — a BLE connection attempt would otherwise wake it. A manually selected camera below still connects regardless.</div>
+        </div>
+        <label class="switch" title="Prevent camera wake-up">
+          <input type="checkbox" id="wakeGuard" checked disabled>
           <span class="track"><span class="thumb"></span></span>
         </label>
       </div>
@@ -614,7 +627,8 @@ const caddxScanResults  = document.getElementById('caddxScanResults');
 const caddxApplyBtn     = document.getElementById('caddxApplyBtn');
 const caddxSavedMsg     = document.getElementById('caddxSavedMsg');
 const stopToggle          = document.getElementById('stopOnDisarm');
-const strictCameraToggle  = document.getElementById('strictCamera');
+const cameraMatchSel      = document.getElementById('cameraMatch');
+const wakeGuardToggle     = document.getElementById('wakeGuard');
 const debugBleToggle      = document.getElementById('debugBle');
 const delayInput     = document.getElementById('disarmDelay');
 const delayEquiv     = document.getElementById('delayEquiv');
@@ -717,8 +731,11 @@ function parseConfigLine(line) {
   } else if (key === 'aux_mode') {
     // "0x0A" — parseInt auto-detects 0x prefix
     auxModeSel.value = parseInt(val).toString();
-  } else if (key === 'strict_camera') {
-    strictCameraToggle.checked = (val === 'true');
+  } else if (key === 'camera_match') {
+    const CAMERA_MATCH_VALUES = { fallback: '0', strict: '1', best_signal: '2' };
+    cameraMatchSel.value = CAMERA_MATCH_VALUES[val] ?? '0';
+  } else if (key === 'wake_guard') {
+    wakeGuardToggle.checked = (val === 'true');
   } else if (key === 'debug_ble') {
     debugBleToggle.checked = (val === 'true');
   } else if (key === 'osd1') { osd1Input.value = val;
@@ -848,12 +865,13 @@ cmdInput.addEventListener('keydown', e => {
 readBtn.addEventListener('click', () => sendCommand('show'));
 
 applyBtn.addEventListener('click', async () => {
-  const delay  = parseInt(delayInput.value) || 0;
-  const stop   = stopToggle.checked ? 1 : 0;
-  const strict = strictCameraToggle.checked ? 1 : 0;
+  const delay      = parseInt(delayInput.value) || 0;
+  const stop       = stopToggle.checked ? 1 : 0;
+  const wakeGuard  = wakeGuardToggle.checked ? 1 : 0;
   await sendCommand(`set camera_type ${cameraTypeSel.value}`);
   const debugBle = debugBleToggle.checked ? 1 : 0;
-  await sendCommand(`set strict_camera ${strict}`);
+  await sendCommand(`set camera_match ${cameraMatchSel.value}`);
+  await sendCommand(`set wake_guard ${wakeGuard}`);
   await sendCommand(`set debug_ble ${debugBle}`);
   await sendCommand(`set disarm_delay ${delay}`);
   await sendCommand(`set stop_on_disarm ${stop}`);
@@ -1147,7 +1165,8 @@ function setConnected(connected) {
   caddxScanBtn.disabled   = !connected;
   caddxApplyBtn.disabled  = !connected;
   stopToggle.disabled         = !connected;
-  strictCameraToggle.disabled = !connected;
+  cameraMatchSel.disabled     = !connected;
+  wakeGuardToggle.disabled    = !connected;
   debugBleToggle.disabled     = !connected;
   delayInput.disabled    = !connected;
   auxChannelSel.disabled = !connected;

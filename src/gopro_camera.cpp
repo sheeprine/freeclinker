@@ -69,9 +69,17 @@ void GoProCamera::startScan() {
     _scanning      = true;
     _candidateAddr = "";
     _candidateName = "";
+    _bestAddr      = "";
+    _bestRssi      = -128;
 
     BLEScan *scan = BLEDevice::getScan();
-    scan->setAdvertisedDeviceCallbacks(this, false);
+    // Duplicate advertisements must stay enabled (with results cleared before
+    // each scan) so a camera transitioning from sleeping to awake at the same
+    // BLE address is seen again — otherwise the stack's dedup would suppress
+    // that transition and the wake guard below would never see the camera
+    // turn on.
+    scan->setAdvertisedDeviceCallbacks(this, /*wantDuplicates=*/true);
+    scan->clearResults();
     scan->setActiveScan(true);
     scan->setInterval(0x50);
     scan->setWindow(0x30);
@@ -88,22 +96,37 @@ void GoProCamera::startScan() {
 void GoProCamera::scanDoneCallback(BLEScanResults /*r*/) {
     if (!_instance) return;
     _instance->_scanning = false;
-    if (!_instance->_targetFound) {
-        if (!_instance->_candidateAddr.empty() && !_instance->_strictCamera) {
-            // Preferred camera wasn't seen — fall back to first GoPro found
-            DBG_SERIAL.printf("[BLE] Preferred not found — connecting to %s\n",
-                              _instance->_candidateAddr.c_str());
-            _instance->_targetAddr  = _instance->_candidateAddr;
-            _instance->_targetName  = _instance->_candidateName;
-            _instance->_targetType  = _instance->_candidateType;
+    if (_instance->_targetFound) return;
+
+    if (_instance->_matchMode == CAM_MATCH_BEST_SIGNAL) {
+        if (!_instance->_bestAddr.empty()) {
+            DBG_SERIAL.printf("[BLE] Best signal — connecting to %s (rssi=%d)\n",
+                              _instance->_bestAddr.c_str(), _instance->_bestRssi);
+            _instance->_targetAddr  = _instance->_bestAddr;
+            _instance->_targetName  = _instance->_bestName;
+            _instance->_targetType  = _instance->_bestType;
             _instance->_targetFound = true;
         } else {
-            if (_instance->_strictCamera && !_instance->_candidateAddr.empty())
-                DBG_SERIAL.println("[BLE] Preferred not found — strict mode, skipping other cameras");
-            else
-                DBG_SERIAL.println("[BLE] Scan done — no GoPro found");
+            DBG_SERIAL.println("[BLE] Scan done — no GoPro found");
             _instance->_lastAttemptMs = millis();
         }
+        return;
+    }
+
+    if (!_instance->_candidateAddr.empty() && _instance->_matchMode != CAM_MATCH_STRICT) {
+        // Preferred camera wasn't seen — fall back to first GoPro found
+        DBG_SERIAL.printf("[BLE] Preferred not found — connecting to %s\n",
+                          _instance->_candidateAddr.c_str());
+        _instance->_targetAddr  = _instance->_candidateAddr;
+        _instance->_targetName  = _instance->_candidateName;
+        _instance->_targetType  = _instance->_candidateType;
+        _instance->_targetFound = true;
+    } else {
+        if (_instance->_matchMode == CAM_MATCH_STRICT && !_instance->_candidateAddr.empty())
+            DBG_SERIAL.println("[BLE] Preferred not found — strict mode, skipping other cameras");
+        else
+            DBG_SERIAL.println("[BLE] Scan done — no GoPro found");
+        _instance->_lastAttemptMs = millis();
     }
 }
 
@@ -112,6 +135,9 @@ void GoProCamera::scanDoneCallback(BLEScanResults /*r*/) {
 // Otherwise record the first GoPro found as fallback and keep scanning.
 void GoProCamera::onResult(BLEAdvertisedDevice device) {
     bool isGoPro = false;
+    std::string mfr;
+    if (device.haveManufacturerData())
+        mfr = device.getManufacturerData();
 
     // Primary: advertised service UUID 0xFEA6
     if (device.haveServiceUUID() &&
@@ -120,13 +146,10 @@ void GoProCamera::onResult(BLEAdvertisedDevice device) {
     }
 
     // Fallback: manufacturer company ID 0xF202
-    if (!isGoPro && device.haveManufacturerData()) {
-        const std::string mfr = device.getManufacturerData();
-        if (mfr.size() >= 2 &&
-            (uint8_t)mfr[0] == GP_MANUFACTURER_ID_HI &&
-            (uint8_t)mfr[1] == GP_MANUFACTURER_ID_LO) {
-            isGoPro = true;
-        }
+    if (!isGoPro && mfr.size() >= 2 &&
+        (uint8_t)mfr[0] == GP_MANUFACTURER_ID_HI &&
+        (uint8_t)mfr[1] == GP_MANUFACTURER_ID_LO) {
+        isGoPro = true;
     }
 
     // Fallback: device name
@@ -143,14 +166,69 @@ void GoProCamera::onResult(BLEAdvertisedDevice device) {
     DBG_SERIAL.printf("[BLE] Found GoPro: \"%s\"  addr=%s  rssi=%d\n",
                       name.c_str(), addr.c_str(), device.getRSSI());
 
+    // ── Wake guard ────────────────────────────────────────────────────────────
+    // A powered-down GoPro keeps advertising for remote-wake, and a plain GATT
+    // connection attempt would wake it — undesirable for a camera the pilot
+    // deliberately left off. Manufacturer data byte [2] is a camera "family"
+    // and byte [3] an awake/sleep state; both were derived from real HERO11
+    // Mini and MAX2 traffic. Unknown families are logged but never
+    // auto-connected, since their sleep-state encoding isn't known. A
+    // manually selected camera (`cameras connect <idx>` / hosted UI) bypasses
+    // this filter for that one address, since that's explicit user intent.
+    std::string preferred = _registry ? _registry->preferredAddr() : "";
+    const bool manualRequest = _registry && _registry->hasSelection() &&
+                               !preferred.empty() && addr == preferred;
+
+    if (_wakeGuard && !manualRequest) {
+        bool knownFamily = false;
+        bool awake       = false;
+
+        if (mfr.size() >= 4 &&
+            (uint8_t)mfr[0] == GP_MANUFACTURER_ID_HI &&
+            (uint8_t)mfr[1] == GP_MANUFACTURER_ID_LO) {
+            const uint8_t family = (uint8_t)mfr[2];
+            const uint8_t state  = (uint8_t)mfr[3];
+
+            if (family == 0x02) {
+                // HERO11 Mini: 0x05=pairing/awake, 0x01=powered-on, 0x00=sleeping
+                knownFamily = true;
+                awake = (state == 0x05 || state == 0x01);
+            } else if (family == 0x03) {
+                // MAX2: 0x01=awake, 0x00=sleeping
+                knownFamily = true;
+                awake = (state == 0x01);
+            }
+
+            if (knownFamily)
+                DBG_SERIAL.printf("[BLE] GoPro \"%s\" family=0x%02X state=0x%02X -> %s\n",
+                                  name.c_str(), family, state, awake ? "AWAKE" : "SLEEP/IGNORE");
+        }
+
+        if (!knownFamily) {
+            DBG_SERIAL.printf("[BLE] GoPro \"%s\" uses unknown manufacturer format — not auto-connecting\n",
+                              name.c_str());
+            return;
+        }
+        if (!awake) return;
+    }
+
+    if (_matchMode == CAM_MATCH_BEST_SIGNAL && !manualRequest) {
+        int8_t rssi = device.getRSSI();
+        if (_bestAddr.empty() || rssi > _bestRssi) {
+            _bestAddr = addr;
+            _bestName = name;
+            _bestType = device.getAddressType();
+            _bestRssi = rssi;
+        }
+        return;  // keep scanning the full window to find the strongest signal
+    }
+
     // Keep first found as fallback
     if (_candidateAddr.empty()) {
         _candidateAddr = addr;
         _candidateName = name;
         _candidateType = device.getAddressType();
     }
-
-    std::string preferred = _registry ? _registry->preferredAddr() : "";
 
     if (!preferred.empty() && addr == preferred) {
         // Preferred camera found — stop scan immediately

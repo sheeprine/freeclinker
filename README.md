@@ -73,7 +73,8 @@ Runtime settings are changed via the USB serial console and persisted across reb
 | Command | Default | Description |
 |---------|---------|-------------|
 | `set camera_type <0-4>` | 0 | Camera protocol: 0 = DJI, 1 = GoPro, 2 = Caddx Orca, 3 = Sony Alpha, 4 = Blackmagic (reboot to apply) |
-| `set strict_camera <0\|1>` | 0 | When 1, only connect to the preferred (last-connected) camera; ignore any other camera found during scan |
+| `set camera_match <0-2>` | 0 | Camera matching strategy: 0 = fallback (preferred if found, else any eligible camera), 1 = strict (preferred only), 2 = best_signal (ignore preferred, connect to whichever eligible camera has the strongest RSSI) |
+| `set wake_guard <0\|1>` | 1 | GoPro only. When 1, don't connect to a camera whose advertisement shows it's asleep/powered-down (a connection attempt would wake it). Bypassed for a manually selected camera (`cameras connect <idx>`) |
 | `set stop_on_disarm <0\|1>` | 1 | Stop recording on FC disarm |
 | `set disarm_delay <ms>` | 0 | Delay between disarm and recording stop |
 | `set aux_channel <0-12>` | 0 | AUX channel for camera mode switch (0 = off) |
@@ -147,6 +148,8 @@ Any DJI Action camera that advertises BLE manufacturer ID `0x08AA` with marker b
 Any GoPro camera supporting the [Open GoPro BLE API](https://gopro.github.io/OpenGoPro/docs/ble/) (HERO 9 and later), identified by advertised service UUID `0xFEA6`. Uses standard TLV-encoded commands and registers for push notifications on status changes.
 
 Older cameras that predate the preset-group scheme (HERO4/5 Session) are also supported: recording, mode switching, and telemetry fall back to that generation's status IDs and capture-mode command automatically, no configuration needed.
+
+A powered-down GoPro keeps advertising for remote-wake, and a plain BLE connection attempt would wake it — undesirable on an FPV quad, where the pilot may have deliberately left a mounted camera off. With `wake_guard` on (the default), the ESP32 recognizes known sleep/awake advertisement states (currently HERO11 Mini and MAX2) and only auto-connects to a camera that's genuinely awake; unrecognized advertisement formats are logged but never auto-connected. Manually selecting a saved camera (`cameras connect <idx>` / hosted UI) always bypasses this filter. Disable with `set wake_guard 0` if this misidentifies your camera generation.
 
 To use a GoPro, connect via serial and run:
 
