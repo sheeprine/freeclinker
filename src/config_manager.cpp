@@ -78,6 +78,7 @@ static const char *cameraTypeName(uint8_t t) {
         case 2:  return "Caddx";
         case 3:  return "Sony";
         case 4:  return "Blackmagic";
+        case 5:  return "Insta360";
         default: return "DJI";
     }
 }
@@ -123,7 +124,7 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         out.println("Commands:");
         out.println("  version                    - print firmware version");
         out.println("  show                       - print all settings");
-        out.println("  set camera_type <0-4>      - 0=DJI, 1=GoPro, 2=Caddx Orca, 3=Sony Alpha, 4=Blackmagic (reboot required)");
+        out.println("  set camera_type <0-5>      - 0=DJI, 1=GoPro, 2=Caddx Orca, 3=Sony Alpha, 4=Blackmagic, 5=Insta360 (reboot required)");
         out.println("  set camera_match <0-2>     - 0=fallback (preferred, else any found), 1=strict (preferred only), 2=best_signal (strongest RSSI, ignores preferred)");
         out.println("  set wake_guard <0|1>       - 1=don't connect to a sleeping/powered-down GoPro (avoids waking it); bypassed for a manually selected camera");
         out.println("  set disarm_delay <ms>      - delay before stopping recording after disarm");
@@ -228,8 +229,8 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
             const char *val = rest + 12;
             while (*val == ' ') val++;
             uint8_t t = static_cast<uint8_t>(strtoul(val, nullptr, 10));
-            if (t > 4) {
-                out.println("[cfg] camera_type must be 0 (DJI), 1 (GoPro), 2 (Caddx), 3 (Sony), or 4 (Blackmagic)");
+            if (t > 5) {
+                out.println("[cfg] camera_type must be 0 (DJI), 1 (GoPro), 2 (Caddx), 3 (Sony), 4 (Blackmagic), or 5 (Insta360)");
                 return;
             }
             setCameraType(t);

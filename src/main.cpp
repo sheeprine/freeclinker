@@ -8,6 +8,7 @@
 #include "caddx_camera.h"
 #include "sony_camera.h"
 #include "blackmagic_camera.h"
+#include "insta360_camera.h"
 #include "msp_serial.h"
 #include "dji_protocol.h"
 #include "web_server.h"
@@ -17,6 +18,7 @@ static GoProCamera     goProCamera;
 static CaddxCamera     caddxCamera;
 static SonyCamera      sonyCamera;
 static BlackmagicCamera blackmagicCamera;
+static Insta360Camera  insta360Camera;
 static Camera         *activeCamera = nullptr;
 
 static CameraRegistry   cameraRegistry;
@@ -127,6 +129,7 @@ void setup() {
         case 2:  activeCamera = &caddxCamera; camTypeName = "Caddx Orca"; break;
         case 3:  activeCamera = &sonyCamera;       camTypeName = "Sony Alpha"; break;
         case 4:  activeCamera = &blackmagicCamera; camTypeName = "Blackmagic"; break;
+        case 5:  activeCamera = &insta360Camera;   camTypeName = "Insta360";   break;
         default: activeCamera = &djiCamera;        camTypeName = "DJI Action"; break;
     }
 
@@ -157,12 +160,14 @@ void setup() {
     caddxCamera.setRegistry(&cameraRegistry);
     sonyCamera.setRegistry(&cameraRegistry);
     blackmagicCamera.setRegistry(&cameraRegistry);
+    insta360Camera.setRegistry(&cameraRegistry);
 
     const uint8_t matchMode = configManager.config().cameraMatchMode;
     djiCamera.setMatchMode(matchMode);
     goProCamera.setMatchMode(matchMode);
     sonyCamera.setMatchMode(matchMode);
     blackmagicCamera.setMatchMode(matchMode);
+    insta360Camera.setMatchMode(matchMode);
 
     // Wake guard only affects GoPro (the only backend with a known
     // sleep/awake advertisement format), but it's harmless to set on all.
@@ -171,12 +176,14 @@ void setup() {
     goProCamera.setWakeGuard(wakeGuard);
     sonyCamera.setWakeGuard(wakeGuard);
     blackmagicCamera.setWakeGuard(wakeGuard);
+    insta360Camera.setWakeGuard(wakeGuard);
 
     const bool debugBle = configManager.config().debugBle;
     djiCamera.setDebugBle(debugBle);
     goProCamera.setDebugBle(debugBle);
     sonyCamera.setDebugBle(debugBle);
     blackmagicCamera.setDebugBle(debugBle);
+    insta360Camera.setDebugBle(debugBle);
 
     activeCamera->setCameraCallback(onCameraData);
     configManager.setCamera(activeCamera, &currentCamera);

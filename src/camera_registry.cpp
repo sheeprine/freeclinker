@@ -12,6 +12,7 @@ static const char *cameraTypeName(uint8_t t) {
         case 2:  return "Caddx";
         case 3:  return "Sony";
         case 4:  return "Blackmagic";
+        case 5:  return "Insta360";
         default: return "DJI";
     }
 }

@@ -336,6 +336,7 @@
           <option value="2">Caddx Orca</option>
           <option value="3">Sony Alpha</option>
           <option value="4">Blackmagic</option>
+          <option value="5">Insta360</option>
         </select>
       </div>
 
@@ -709,7 +710,7 @@ function parseConfigLine(line) {
   const val = m[2].trim().replace(/\s*\(saved.*/, '');
 
   if (key === 'camera_type') {
-    const CAMERA_TYPE_VALUES = { DJI: '0', GoPro: '1', Caddx: '2', Sony: '3', Blackmagic: '4' };
+    const CAMERA_TYPE_VALUES = { DJI: '0', GoPro: '1', Caddx: '2', Sony: '3', Blackmagic: '4', Insta360: '5' };
     cameraTypeSel.value = CAMERA_TYPE_VALUES[val] ?? '0';
     updateCameraTypeState();
   } else if (key === 'caddx_ssid') {
@@ -976,7 +977,7 @@ function parseCameraLines(lines) {
     // ADDR isn't fixed-format — Caddx entries store a Wi-Fi SSID there
     // instead of a MAC — so it's delimited the same way NAME is: lazily,
     // up to the next 2+-space run.
-    const m = line.match(/^\[reg\]\s+(\d+):\s(.+?)\s{2,}(.+?)\s{2,}(DJI|GoPro|Caddx|Sony|Blackmagic)(.*)/);
+    const m = line.match(/^\[reg\]\s+(\d+):\s(.+?)\s{2,}(.+?)\s{2,}(DJI|GoPro|Caddx|Sony|Blackmagic|Insta360)(.*)/);
     if (m) cameras.push({
       idx:  parseInt(m[1]),
       name: m[2].trim(),

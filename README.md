@@ -72,7 +72,7 @@ Runtime settings are changed via the USB serial console and persisted across reb
 
 | Command | Default | Description |
 |---------|---------|-------------|
-| `set camera_type <0-4>` | 0 | Camera protocol: 0 = DJI, 1 = GoPro, 2 = Caddx Orca, 3 = Sony Alpha, 4 = Blackmagic (reboot to apply) |
+| `set camera_type <0-5>` | 0 | Camera protocol: 0 = DJI, 1 = GoPro, 2 = Caddx Orca, 3 = Sony Alpha, 4 = Blackmagic, 5 = Insta360 (reboot to apply) |
 | `set camera_match <0-2>` | 0 | Camera matching strategy: 0 = fallback (preferred if found, else any eligible camera), 1 = strict (preferred only), 2 = best_signal (ignore preferred, connect to whichever eligible camera has the strongest RSSI) |
 | `set wake_guard <0\|1>` | 1 | GoPro only. When 1, don't connect to a camera whose advertisement shows it's asleep/powered-down (a connection attempt would wake it). Bypassed for a manually selected camera (`cameras connect <idx>`) |
 | `set stop_on_disarm <0\|1>` | 1 | Stop recording on FC disarm |
@@ -197,3 +197,13 @@ set camera_type 4
 ```
 
 Reboot after setting the camera type. The first connection requires pairing: the camera displays a **6-digit PIN on its own screen**, which you must type into the USB serial console when the firmware prompts for it (there's no way to automate this — the ESP32 has no display). This only happens once; the bond is remembered afterwards. Only recording start/stop is supported (`switchCameraMode` is unsupported — these cameras have no separate photo/video mode) and no battery/resolution/fps/stabilisation telemetry is exposed over BLE for this camera family.
+
+### Insta360 (X3, X4, ONE R/RS, GO 2/3, etc.)
+
+Identified by the advertised BLE camera-control service (UUID `0000be80-...`) where the camera includes it in its advertisement, or — best-effort, since Insta360 publishes no scan-identification info — an advertised name that looks like a known model. Uses the same simple BLE command channel the official phone app speaks, no bonding required.
+
+```
+set camera_type 5
+```
+
+Reboot after setting the camera type. Only recording start/stop is supported (`switchCameraMode` is unsupported — the protocol only exposes separate "start recording in mode X" commands, not a stateless mode switch), confirmed via the camera's ack for each command rather than a pushed status. Battery is reported if the camera exposes the standard Bluetooth Battery Service; no resolution/fps/stabilisation telemetry is available (the camera's own status messages use a protobuf schema that isn't publicly available to decode).
