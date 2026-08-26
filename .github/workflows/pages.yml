@@ -27,14 +27,22 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
-      - name: Download latest firmware release
+      - name: Download firmware releases
         run: |
           mkdir -p web/firmware
-          gh release download \
-            --repo ${{ github.repository }} \
-            --pattern "*.bin" \
-            --dir web/firmware \
-            2>/dev/null || echo "No release assets yet, skipping firmware download"
+          tags=$(gh release list --repo ${{ github.repository }} --limit 15 --json tagName --jq '.[].tagName')
+          if [ -z "$tags" ]; then
+            echo "No releases yet, skipping firmware download"
+          fi
+          for tag in $tags; do
+            mkdir -p "web/firmware/$tag"
+            gh release download "$tag" \
+              --repo ${{ github.repository }} \
+              --pattern "*.bin" \
+              --dir "web/firmware/$tag" \
+              --clobber \
+              2>/dev/null || echo "Failed to download assets for $tag, skipping"
+          done
         env:
           GH_TOKEN: ${{ github.token }}
 

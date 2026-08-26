@@ -197,14 +197,14 @@ The AP stops as soon as a camera connects (BLE pairing takes priority). It resta
 
 ### Option B — USB Serial (Chrome / Edge desktop only)
 
-**Hosted:** open **[sheeprine.github.io/freeclinker](https://sheeprine.github.io/freeclinker/)** in Chrome or Edge.
+**Hosted:** open **[sheeprine.github.io/freeclinker/config.html](https://sheeprine.github.io/freeclinker/config.html)** in Chrome or Edge.
 
-**Local:** open `web/index.html` from the cloned repo:
+**Local:** open `web/config.html` from the cloned repo:
 
 ```bash
-open web/index.html          # macOS
-start web/index.html         # Windows
-xdg-open web/index.html      # Linux
+open web/config.html          # macOS
+start web/config.html         # Windows
+xdg-open web/config.html      # Linux
 ```
 
 Click **Connect**, select the ESP32 serial port from the browser dialog, and confirm at **115200** baud.

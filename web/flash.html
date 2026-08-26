@@ -75,6 +75,22 @@
     .version { font-size: 20px; color: #2563eb; }
     .rel-date { font-size: 11px; color: #6b7280; }
 
+    select {
+      background: #ffffff;
+      color: #111827;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      padding: 6px 8px;
+      font: inherit;
+      font-size: 13px;
+    }
+
+    .version-select {
+      width: 100%;
+      margin-bottom: 24px;
+    }
+    .version-select:disabled { opacity: 0.5; }
+
     /* ── Board cards ─────────────────────────────────────────────────────────── */
     .section-label {
       font-size: 11px;
@@ -183,7 +199,8 @@
 
 <header>
   <span class="brand">FreeCLinker</span>
-  <a href="index.html">Config UI</a>
+  <a href="index.html">Home</a>
+  <a href="config.html">Config UI</a>
   <a href="https://github.com/sheeprine/freeclinker" target="_blank" rel="noopener">GitHub</a>
 </header>
 
@@ -201,14 +218,20 @@
         <span class="rel-date" id="relDate"></span>
       </div>
 
+      <!-- Version selection -->
+      <div class="section-label">Firmware version</div>
+      <select id="versionSelect" class="version-select" disabled>
+        <option>Loading…</option>
+      </select>
+
       <!-- Board selection -->
       <div class="section-label">Select your board</div>
       <div class="board-grid">
-        <div class="board-card selected" data-target="esp32dev">
+        <div class="board-card" data-target="esp32dev">
           <div class="board-name">ESP32 Dev Board</div>
           <div class="board-desc">Standard 38-pin WROOM/WROVER module</div>
         </div>
-        <div class="board-card" data-target="esp32c3supermini">
+        <div class="board-card selected" data-target="esp32c3supermini">
           <div class="board-name">ESP32-C3 Super Mini</div>
           <div class="board-desc">Compact RISC-V board (USB CDC)</div>
         </div>
@@ -239,40 +262,45 @@
 <script>
 'use strict';
 
-const REPO    = 'sheeprine/freeclinker';
-const GH_API  = `https://api.github.com/repos/${REPO}/releases/latest`;
+const REPO     = 'sheeprine/freeclinker';
+const GH_API   = `https://api.github.com/repos/${REPO}/releases?per_page=15`;
 
-// Firmware binaries are served from the same origin (no CORS) via
-// the Pages deployment which downloads release assets into firmware/.
+// Firmware binaries are served from the same origin (no CORS) via the Pages
+// deployment, which downloads each release's assets into firmware/<tag>/.
 const BASE = window.location.origin + window.location.pathname.replace(/\/[^/]+$/, '');
 const FW   = `${BASE}/firmware`;
 
-const TARGETS = {
-  esp32dev: {
-    chipFamily: 'ESP32',
-    parts: [
-      { path: `${FW}/bootloader-esp32dev.bin`, offset: 0x1000 },
-      { path: `${FW}/partitions-esp32dev.bin`, offset: 0x8000 },
-      { path: `${FW}/firmware-esp32dev.bin`,   offset: 0x10000 },
-    ],
-  },
-  esp32c3supermini: {
+function buildTarget(target, version) {
+  const dir = `${FW}/${version}`;
+  if (target === 'esp32dev') {
+    return {
+      chipFamily: 'ESP32',
+      parts: [
+        { path: `${dir}/bootloader-esp32dev.bin`, offset: 0x1000 },
+        { path: `${dir}/partitions-esp32dev.bin`, offset: 0x8000 },
+        { path: `${dir}/firmware-esp32dev.bin`,   offset: 0x10000 },
+      ],
+    };
+  }
+  return {
     chipFamily: 'ESP32-C3',
     parts: [
-      { path: `${FW}/bootloader-esp32c3supermini.bin`, offset: 0x0 },
-      { path: `${FW}/partitions-esp32c3supermini.bin`, offset: 0x8000 },
-      { path: `${FW}/firmware-esp32c3supermini.bin`,   offset: 0x10000 },
+      { path: `${dir}/bootloader-esp32c3supermini.bin`, offset: 0x0 },
+      { path: `${dir}/partitions-esp32c3supermini.bin`, offset: 0x8000 },
+      { path: `${dir}/firmware-esp32c3supermini.bin`,   offset: 0x10000 },
     ],
-  },
-};
+  };
+}
 
-let selectedTarget  = 'esp32dev';
+let selectedTarget  = 'esp32c3supermini';
 let currentVersion  = 'unknown';
 let manifestBlobUrl = null;
+let releases        = [];
 
-const installBtn = document.getElementById('installBtn');
-const versionEl  = document.getElementById('version');
-const relDateEl  = document.getElementById('relDate');
+const installBtn     = document.getElementById('installBtn');
+const versionEl      = document.getElementById('version');
+const relDateEl      = document.getElementById('relDate');
+const versionSelect  = document.getElementById('versionSelect');
 
 // Board card selection
 document.querySelectorAll('.board-card').forEach(card => {
@@ -284,34 +312,49 @@ document.querySelectorAll('.board-card').forEach(card => {
   });
 });
 
+// Version dropdown selection
+versionSelect.addEventListener('change', () => {
+  const rel = releases.find(r => r.tag_name === versionSelect.value);
+  if (rel) selectRelease(rel);
+});
+
+function selectRelease(rel) {
+  currentVersion          = rel.tag_name;
+  versionEl.textContent   = rel.tag_name;
+  versionEl.removeAttribute('class');
+  versionEl.className     = 'version';
+  const d                 = new Date(rel.published_at);
+  relDateEl.textContent   = `Released ${d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' })}`;
+  document.getElementById('releaseLink').href = rel.html_url;
+  applyManifest();
+}
+
 function applyManifest() {
   if (manifestBlobUrl) URL.revokeObjectURL(manifestBlobUrl);
   const manifest = {
     name:                     'FreeCLinker',
     version:                  currentVersion,
     new_install_prompt_erase: true,
-    builds:                   [TARGETS[selectedTarget]],
+    builds:                   [buildTarget(selectedTarget, currentVersion)],
   };
   const blob       = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
   manifestBlobUrl  = URL.createObjectURL(blob);
   installBtn.setAttribute('manifest', manifestBlobUrl);
 }
 
-// Fetch latest release metadata from GitHub API
+// Fetch release history from GitHub API and populate the version dropdown
 fetch(GH_API)
   .then(r => r.ok ? r.json() : Promise.reject(r.status))
-  .then(rel => {
-    currentVersion          = rel.tag_name;
-    versionEl.textContent   = rel.tag_name;
-    versionEl.removeAttribute('class');
-    versionEl.className     = 'version';
-    const d                 = new Date(rel.published_at);
-    relDateEl.textContent   = `Released ${d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' })}`;
-    document.getElementById('releaseLink').href = rel.html_url;
-    applyManifest();
+  .then(rels => {
+    if (!Array.isArray(rels) || rels.length === 0) return Promise.reject('no releases');
+    releases = rels;
+    versionSelect.innerHTML = rels.map(r => `<option value="${r.tag_name}">${r.tag_name}</option>`).join('');
+    versionSelect.disabled  = false;
+    selectRelease(rels[0]);
   })
   .catch(() => {
-    versionEl.innerHTML = '<span class="err">Could not fetch release info</span>';
+    versionEl.innerHTML     = '<span class="err">Could not fetch release info</span>';
+    versionSelect.innerHTML = '<option>Unavailable</option>';
     applyManifest();
   });
 

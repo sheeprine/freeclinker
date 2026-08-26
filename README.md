@@ -4,6 +4,7 @@ FreeCLinker as in Free Cam Linker. Pronounced *freak linker* because we know
 you bunch of freaks like to film yourself doing *illegal* stuff.
 ESP32 firmware that connects a DJI Action or GoPro camera to a Betaflight flight controller.
 
+**→ [sheeprine.github.io/freeclinker](https://sheeprine.github.io/freeclinker/)** — project site (flash firmware, configure over Web Serial, browse supported cameras)
 **→ [Quickstart guide](QUICKSTART.md)** — wiring, build, flash, and web interface setup. The ESP32 bridges the two devices: it receives camera telemetry over BLE and forwards it to the FC via MSP serial, and automatically starts/stops camera recording when the FC arms or disarms.
 
 ## How it works
@@ -115,9 +116,9 @@ Connect your phone or laptop to the `FreeCLinker` network and open that URL. The
 
 **USB Serial (Chrome / Edge desktop)**
 
-**→ [sheeprine.github.io/freeclinker](https://sheeprine.github.io/freeclinker/)** — hosted config UI
+**→ [sheeprine.github.io/freeclinker/config.html](https://sheeprine.github.io/freeclinker/config.html)** — hosted config UI
 
-Or open `web/index.html` locally (no server required). Connect to the ESP32 via the browser's Web Serial dialog to get a graphical config panel and an interactive CLI terminal.
+Or open `web/config.html` locally (no server required). Connect to the ESP32 via the browser's Web Serial dialog to get a graphical config panel and an interactive CLI terminal.
 
 ## Flashing from the browser
 
