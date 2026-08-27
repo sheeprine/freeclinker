@@ -50,6 +50,10 @@ void CaddxCamera::begin() {
     // no-ops its internal re-init when that bit is already set, so the
     // config portal AP silently never starts broadcasting.
     WiFi.mode(WIFI_MODE_APSTA);
+    // WiFi.setTxPower() only takes effect once the Wi-Fi driver is up, which
+    // WiFi.mode() above guarantees; must be called before WiFi.begin() or the
+    // in-progress association can start at the old power level.
+    WiFi.setTxPower(_lowPowerMode ? WIFI_POWER_MINUS_1dBm : WIFI_POWER_19_5dBm);
     DBG_SERIAL.printf("[caddx] Joining Wi-Fi \"%s\"%s...\n", _ssid.c_str(),
                       _usingDefaultPass ? " (trying factory default password)" : "");
     _connectStartMs = millis();

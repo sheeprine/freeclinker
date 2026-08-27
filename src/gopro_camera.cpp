@@ -13,7 +13,7 @@ GoProCamera *GoProCamera::_instance = nullptr;
 void GoProCamera::begin() {
     _instance = this;
     BLEDevice::init("ESP32-GP-Bridge");
-    BLEDevice::setPower(ESP_PWR_LVL_P9);
+    BLEDevice::setPower(_lowPowerMode ? ESP_PWR_LVL_N12 : ESP_PWR_LVL_P9);
     BLEDevice::setMTU(500);
 
     // MAX2 rejects Open GoPro commands on an unsecured link; request Secure

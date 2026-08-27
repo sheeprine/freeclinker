@@ -41,11 +41,18 @@ public:
     void setWakeGuard(bool v)                 { _wakeGuard = v; }
     // When true, implementations log raw BLE TX/RX packets to DBG_SERIAL.
     void setDebugBle(bool v)                  { _debugBle = v; }
+    // When true (default), radio TX power is set to its minimum instead of
+    // maximum — shorter range, but less RF interference with the flight
+    // controller's 2.4GHz RC receiver, which shares the aircraft with this
+    // radio. Applies to BLE power on the BLE-based backends and, for
+    // CaddxCamera (the only Wi-Fi backend), Wi-Fi TX power.
+    void setLowPowerMode(bool v)              { _lowPowerMode = v; }
 
 protected:
-    CameraCallback  _cameraCb   = nullptr;
-    CameraRegistry *_registry   = nullptr;
-    uint8_t         _matchMode  = CAM_MATCH_FALLBACK;
-    bool            _wakeGuard  = true;
-    bool            _debugBle   = false;  // when true, log raw BLE packets
+    CameraCallback  _cameraCb     = nullptr;
+    CameraRegistry *_registry     = nullptr;
+    uint8_t         _matchMode    = CAM_MATCH_FALLBACK;
+    bool            _wakeGuard    = true;
+    bool            _debugBle     = false;  // when true, log raw BLE packets
+    bool            _lowPowerMode = true;
 };

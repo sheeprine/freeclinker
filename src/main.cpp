@@ -185,6 +185,18 @@ void setup() {
     blackmagicCamera.setDebugBle(debugBle);
     insta360Camera.setDebugBle(debugBle);
 
+    // Low power mode sets BLE TX power to its minimum on the BLE backends
+    // and, for Caddx (the only Wi-Fi backend), Wi-Fi TX power, to reduce RF
+    // interference with the flight controller's RC receiver — harmless to
+    // set on all since each begin() only reads its own relevant radio.
+    const bool lowPowerMode = configManager.config().lowPowerMode;
+    djiCamera.setLowPowerMode(lowPowerMode);
+    goProCamera.setLowPowerMode(lowPowerMode);
+    caddxCamera.setLowPowerMode(lowPowerMode);
+    sonyCamera.setLowPowerMode(lowPowerMode);
+    blackmagicCamera.setLowPowerMode(lowPowerMode);
+    insta360Camera.setLowPowerMode(lowPowerMode);
+
     activeCamera->setCameraCallback(onCameraData);
     configManager.setCamera(activeCamera, &currentCamera);
     activeCamera->begin();

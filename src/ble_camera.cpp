@@ -11,7 +11,7 @@ BLECamera *BLECamera::_instance = nullptr;
 void BLECamera::begin() {
     _instance = this;
     BLEDevice::init("ESP32-DJI-Bridge");
-    BLEDevice::setPower(ESP_PWR_LVL_P9);
+    BLEDevice::setPower(_lowPowerMode ? ESP_PWR_LVL_N12 : ESP_PWR_LVL_P9);
     BLEDevice::setMTU(500);   // sets local preference; per-connection exchange done via _client->setMTU()
     startScan();
 }

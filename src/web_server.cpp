@@ -86,6 +86,7 @@ void WebConfigServer::handleGetConfig() {
     doc["aux_mode"]       = c.auxMode;
     doc["camera_match"]   = c.cameraMatchMode;
     doc["wake_guard"]     = c.cameraWakeGuard;
+    doc["low_power"]      = c.lowPowerMode;
     doc["osd1"]           = c.osd1Tpl;
     doc["osd2"]           = c.osd2Tpl;
     doc["osd3"]           = c.osd3Tpl;
@@ -118,6 +119,7 @@ void WebConfigServer::handlePostConfig() {
     if (doc["aux_mode"].is<int>())        _cfg->setAuxMode(doc["aux_mode"].as<uint8_t>());
     if (doc["camera_match"].is<int>())    _cfg->setCameraMatchMode(doc["camera_match"].as<uint8_t>());
     if (doc["wake_guard"].is<bool>())     _cfg->setCameraWakeGuard(doc["wake_guard"].as<bool>());
+    if (doc["low_power"].is<bool>())      _cfg->setLowPowerMode(doc["low_power"].as<bool>());
     if (doc["osd1"].is<const char *>())   _cfg->setOsdTemplate(1, doc["osd1"].as<const char *>());
     if (doc["osd2"].is<const char *>())   _cfg->setOsdTemplate(2, doc["osd2"].as<const char *>());
     if (doc["osd3"].is<const char *>())   _cfg->setOsdTemplate(3, doc["osd3"].as<const char *>());

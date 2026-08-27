@@ -19,6 +19,7 @@ static constexpr const char *KEY_OSD4 = "osd4_tpl";
 static constexpr const char *KEY_CMM  = "cam_match";
 static constexpr const char *KEY_WAKE = "wake_guard";
 static constexpr const char *KEY_DBG  = "debug_ble";
+static constexpr const char *KEY_LPM  = "low_power";
 static constexpr const char *KEY_BF45  = "bf45_compat";
 static constexpr const char *KEY_PILOT = "pilot_tpl";
 static constexpr const char *KEY_CRAFT = "craft_tpl";
@@ -45,6 +46,7 @@ void ConfigManager::load() {
     _cfg.cameraMatchMode   = static_cast<uint8_t>(_prefs.getUInt(KEY_CMM, DEFAULT_CAMERA_MATCH_MODE));
     _cfg.cameraWakeGuard   = _prefs.getBool(KEY_WAKE, DEFAULT_CAMERA_WAKE_GUARD);
     _cfg.debugBle          = _prefs.getBool(KEY_DBG, DEFAULT_DEBUG_BLE);
+    _cfg.lowPowerMode      = _prefs.getBool(KEY_LPM, DEFAULT_LOW_POWER_MODE);
     loadStr(_prefs, KEY_OSD1, _cfg.osd1Tpl, sizeof(_cfg.osd1Tpl), DEFAULT_OSD1_TPL);
     loadStr(_prefs, KEY_OSD2, _cfg.osd2Tpl, sizeof(_cfg.osd2Tpl), DEFAULT_OSD2_TPL);
     loadStr(_prefs, KEY_OSD3, _cfg.osd3Tpl, sizeof(_cfg.osd3Tpl), DEFAULT_OSD3_TPL);
@@ -63,6 +65,7 @@ void ConfigManager::save() {
     _prefs.putUInt(KEY_CMM, _cfg.cameraMatchMode);
     _prefs.putBool(KEY_WAKE, _cfg.cameraWakeGuard);
     _prefs.putBool(KEY_DBG, _cfg.debugBle);
+    _prefs.putBool(KEY_LPM, _cfg.lowPowerMode);
     _prefs.putString(KEY_OSD1, _cfg.osd1Tpl);
     _prefs.putString(KEY_OSD2, _cfg.osd2Tpl);
     _prefs.putString(KEY_OSD3, _cfg.osd3Tpl);
@@ -97,6 +100,7 @@ void ConfigManager::printAll(Stream &out) {
         out.printf("[cfg] aux_channel     = AUX%u\n", _cfg.auxChannel);
     out.printf("[cfg] aux_mode        = 0x%02X\n", _cfg.auxMode);
     out.printf("[cfg] debug_ble       = %s\n", _cfg.debugBle ? "true" : "false");
+    out.printf("[cfg] low_power       = %s\n", _cfg.lowPowerMode ? "true" : "false");
     out.printf("[cfg] osd1            = %s\n", _cfg.osd1Tpl);
     out.printf("[cfg] osd2            = %s\n", _cfg.osd2Tpl);
     out.printf("[cfg] osd3            = %s\n", _cfg.osd3Tpl);
@@ -132,6 +136,7 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         out.println("  set aux_channel <0-12>     - AUX channel for camera mode switch (0=off)");
         out.println("  set aux_mode <0x00-0xFF>   - camera mode when AUX high (0x00=slow_motion 0x01=video 0x0A=hyperlapse)");
         out.println("  set debug_ble <0|1>        - log raw BLE TX/RX packets to the serial console");
+        out.println("  set low_power <0|1>        - 1=minimum BLE/Wi-Fi TX power (default) to reduce RC receiver interference, shorter range; 0=maximum TX power (reboot required)");
         out.println("  set osd1 <template>        - OSD Custom Message 1 template (default: battery)");
         out.println("  set osd2 <template>        - OSD Custom Message 2 template (default: recording)");
         out.println("  set osd3 <template>        - OSD Custom Message 3 template (default: settings)");
@@ -305,6 +310,14 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
             while (*val == ' ') val++;
             setDebugBle(strtoul(val, nullptr, 10) != 0);
             out.printf("[cfg] debug_ble = %s (saved)\n", _cfg.debugBle ? "true" : "false");
+            return;
+        }
+
+        if (strncmp(rest, "low_power ", 10) == 0) {
+            const char *val = rest + 10;
+            while (*val == ' ') val++;
+            setLowPowerMode(strtoul(val, nullptr, 10) != 0);
+            out.printf("[cfg] low_power = %s (saved — reboot to apply)\n", _cfg.lowPowerMode ? "true" : "false");
             return;
         }
 
@@ -541,6 +554,11 @@ void ConfigManager::setCameraWakeGuard(bool v) {
 void ConfigManager::setDebugBle(bool v) {
     _cfg.debugBle = v;
     _prefs.putBool(KEY_DBG, v);
+}
+
+void ConfigManager::setLowPowerMode(bool v) {
+    _cfg.lowPowerMode = v;
+    _prefs.putBool(KEY_LPM, v);
 }
 
 void ConfigManager::setOsdTemplate(uint8_t n, const char *tpl) {

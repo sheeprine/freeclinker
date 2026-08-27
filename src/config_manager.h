@@ -21,6 +21,7 @@ public:
         uint8_t  cameraMatchMode;    // CAM_MATCH_* — see camera.h
         bool     cameraWakeGuard;    // true = don't connect to a sleeping/powered-down GoPro (see camera.h setWakeGuard)
         bool     debugBle;           // true = log raw BLE TX/RX packets to the serial console
+        bool     lowPowerMode;       // true = minimum BLE/Wi-Fi TX power, to reduce interference with the RC receiver (see camera.h setLowPowerMode)
         // OSD custom message templates — tokens: {bat} {rec} {mode} {res} {fps} {eis} {rleft} {rcap}
         char osd1Tpl[OSD_TPL_LEN];  // Custom Message 1 (default: battery)
         char osd2Tpl[OSD_TPL_LEN];  // Custom Message 2 (default: recording state)
@@ -46,6 +47,7 @@ public:
     static constexpr uint8_t  DEFAULT_CAMERA_MATCH_MODE    = 0;     // CAM_MATCH_FALLBACK
     static constexpr bool     DEFAULT_CAMERA_WAKE_GUARD    = true;
     static constexpr bool     DEFAULT_DEBUG_BLE            = false;
+    static constexpr bool     DEFAULT_LOW_POWER_MODE       = true;
     static constexpr const char *DEFAULT_OSD1_TPL = "CAM:{bat}";
     static constexpr const char *DEFAULT_OSD2_TPL = "{rec}";
     static constexpr const char *DEFAULT_OSD3_TPL = "{mode} {res}/{fps} {eis}";
@@ -75,6 +77,7 @@ public:
     void setCameraMatchMode(uint8_t v);
     void setCameraWakeGuard(bool v);
     void setDebugBle(bool v);
+    void setLowPowerMode(bool v);
     void setOsdTemplate(uint8_t n, const char *tpl);  // n = 1..4
     void setBf45Compat(bool v);
     void setPilotNameTemplate(const char *tpl);

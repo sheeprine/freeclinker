@@ -218,6 +218,18 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
         </label>
       </div>
 
+      <!-- Low power mode -->
+      <div class="cfg-field">
+        <div class="cfg-field-text">
+          <div class="cfg-field-name">Low power mode</div>
+          <div class="cfg-field-desc">Minimum BLE TX power (Wi-Fi TX power too, for Caddx Orca) — shorter range, but less RF interference with the flight controller's RC receiver. On by default. Reboot required to apply.</div>
+        </div>
+        <label class="switch" title="Low power mode">
+          <input type="checkbox" id="lowPower" checked>
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+
       <!-- Stop on disarm -->
       <div class="cfg-field">
         <div class="cfg-field-text">
@@ -472,6 +484,7 @@ const osd3Input    = document.getElementById('osd3');
 const osd4Input    = document.getElementById('osd4');
 const cameraMatchSel = document.getElementById('cameraMatch');
 const wakeGuardToggle = document.getElementById('wakeGuard');
+const lowPowerToggle = document.getElementById('lowPower');
 const bf45ApplyBtn = document.getElementById('bf45ApplyBtn');
 const bf45SavedMsg = document.getElementById('bf45SavedMsg');
 const bf45CompatToggle = document.getElementById('bf45Compat');
@@ -521,6 +534,7 @@ async function loadConfig() {
     auxModeSel.value     = j.aux_mode      ?? 0;
     cameraMatchSel.value = j.camera_match  ?? 0;
     wakeGuardToggle.checked = j.wake_guard ?? true;
+    lowPowerToggle.checked = j.low_power ?? true;
     osd1Input.value      = j.osd1 ?? '';
     osd2Input.value      = j.osd2 ?? '';
     osd3Input.value      = j.osd3 ?? '';
@@ -601,6 +615,7 @@ applyBtn.addEventListener('click', async () => {
       camera_type:    parseInt(cameraTypeSel.value),
       camera_match:   parseInt(cameraMatchSel.value),
       wake_guard:     wakeGuardToggle.checked,
+      low_power:      lowPowerToggle.checked,
       stop_on_disarm: stopToggle.checked,
       disarm_delay:   parseInt(delayInput.value) || 0
     };

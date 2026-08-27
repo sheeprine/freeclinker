@@ -10,7 +10,7 @@ BlackmagicCamera *BlackmagicCamera::_instance = nullptr;
 void BlackmagicCamera::begin() {
     _instance = this;
     BLEDevice::init(BMD_DEVICE_NAME);
-    BLEDevice::setPower(ESP_PWR_LVL_P9);
+    BLEDevice::setPower(_lowPowerMode ? ESP_PWR_LVL_N12 : ESP_PWR_LVL_P9);
 
     // Outgoing/Incoming Camera Control and Camera Status are all marked
     // "(encrypted)" in the protocol doc — the first read/write/subscribe on

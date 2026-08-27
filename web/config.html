@@ -394,6 +394,18 @@
         </label>
       </div>
 
+      <!-- Low power mode -->
+      <div class="cfg-field">
+        <div class="cfg-field-text">
+          <div class="cfg-field-name">Low power mode</div>
+          <div class="cfg-field-desc">Minimum BLE TX power (Wi-Fi TX power too, for Caddx Orca) — shorter range, but less RF interference with the flight controller's RC receiver. On by default. Reboot required to apply.</div>
+        </div>
+        <label class="switch" title="Low power mode">
+          <input type="checkbox" id="lowPower" checked disabled>
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+
       <!-- Disarm delay -->
       <div class="cfg-field" style="flex-direction:column; align-items:flex-start;">
         <div class="cfg-field-name">Disarm delay</div>
@@ -636,6 +648,7 @@ const stopToggle          = document.getElementById('stopOnDisarm');
 const cameraMatchSel      = document.getElementById('cameraMatch');
 const wakeGuardToggle     = document.getElementById('wakeGuard');
 const debugBleToggle      = document.getElementById('debugBle');
+const lowPowerToggle      = document.getElementById('lowPower');
 const delayInput     = document.getElementById('disarmDelay');
 const delayEquiv     = document.getElementById('delayEquiv');
 const savedMsg       = document.getElementById('savedMsg');
@@ -744,6 +757,8 @@ function parseConfigLine(line) {
     wakeGuardToggle.checked = (val === 'true');
   } else if (key === 'debug_ble') {
     debugBleToggle.checked = (val === 'true');
+  } else if (key === 'low_power') {
+    lowPowerToggle.checked = (val === 'true');
   } else if (key === 'osd1') { osd1Input.value = val;
   } else if (key === 'osd2') { osd2Input.value = val;
   } else if (key === 'osd3') { osd3Input.value = val;
@@ -876,9 +891,11 @@ applyBtn.addEventListener('click', async () => {
   const wakeGuard  = wakeGuardToggle.checked ? 1 : 0;
   await sendCommand(`set camera_type ${cameraTypeSel.value}`);
   const debugBle = debugBleToggle.checked ? 1 : 0;
+  const lowPower = lowPowerToggle.checked ? 1 : 0;
   await sendCommand(`set camera_match ${cameraMatchSel.value}`);
   await sendCommand(`set wake_guard ${wakeGuard}`);
   await sendCommand(`set debug_ble ${debugBle}`);
+  await sendCommand(`set low_power ${lowPower}`);
   await sendCommand(`set disarm_delay ${delay}`);
   await sendCommand(`set stop_on_disarm ${stop}`);
   flashSaved(savedMsg);
@@ -1174,6 +1191,7 @@ function setConnected(connected) {
   cameraMatchSel.disabled     = !connected;
   wakeGuardToggle.disabled    = !connected;
   debugBleToggle.disabled     = !connected;
+  lowPowerToggle.disabled     = !connected;
   delayInput.disabled    = !connected;
   auxChannelSel.disabled = !connected;
   auxApplyBtn.disabled   = !connected;
