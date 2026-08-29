@@ -255,11 +255,19 @@ void loop() {
         }
     }
 
-    if (!camConnected && cameraWasConnected && !forceAP && configManager.config().wifiApEnabled) {
-        // Camera just disconnected — restart the countdown.
-        DBG_SERIAL.printf("[wifi] Camera disconnected — AP starts in %u s\n",
-                          configManager.config().wifiApStartDelaySec);
-        wifiDelayOriginMs = now;
+    if (!camConnected && cameraWasConnected) {
+        // Camera just disconnected — drop stale telemetry (recording state,
+        // battery %, etc.) so the OSD reports NC instead of the last-known
+        // values, and push that update immediately.
+        currentCamera = CameraData{};
+        hasCamera     = true;
+
+        if (!forceAP && configManager.config().wifiApEnabled) {
+            // Camera just disconnected — restart the countdown.
+            DBG_SERIAL.printf("[wifi] Camera disconnected — AP starts in %u s\n",
+                              configManager.config().wifiApStartDelaySec);
+            wifiDelayOriginMs = now;
+        }
     }
 
     cameraWasConnected = camConnected;
@@ -283,7 +291,6 @@ void loop() {
 
     // ── Camera telemetry ───────────────────────────────────────────────────────
     const bool battKeepalive =
-        activeCamera->isConnected() &&
         MSP_BATTERY_KEEPALIVE_MS > 0 &&
         (now - lastBattMs) >= MSP_BATTERY_KEEPALIVE_MS;
 
