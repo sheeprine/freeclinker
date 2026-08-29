@@ -290,8 +290,8 @@ void loop() {
         if (cfg.bf45Compat) {
             // Betaflight 4.5 has no Custom Message 1-4 OSD fields — sending
             // them would just be ignored, so use Pilot Name/Craft Name instead.
-            mspSerial.sendPilotName(currentCamera, cfg.pilotNameTpl);
-            mspSerial.sendCraftName(currentCamera, cfg.craftNameTpl);
+            if (cfg.pilotNameEnabled) mspSerial.sendPilotName(currentCamera, cfg.pilotNameTpl);
+            if (cfg.craftNameEnabled) mspSerial.sendCraftName(currentCamera, cfg.craftNameTpl);
         } else {
             mspSerial.sendCustomOSD1(currentCamera, cfg.osd1Tpl);
             mspSerial.sendCustomOSD2(currentCamera, cfg.osd2Tpl);

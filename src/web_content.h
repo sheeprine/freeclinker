@@ -377,13 +377,25 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
       </div>
 
       <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
-        <div class="cfg-field-name">Pilot Name</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+          <div class="cfg-field-name">Pilot Name</div>
+          <label class="switch" title="Send Pilot Name">
+            <input type="checkbox" id="pilotEn">
+            <span class="track"><span class="thumb"></span></span>
+          </label>
+        </div>
         <div class="cfg-field-desc">Default: battery percentage. Sent only when BF4.5 mode is on.</div>
         <input class="tpl-input" id="pilotTpl" type="text" maxlength="31" spellcheck="false">
       </div>
 
       <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
-        <div class="cfg-field-name">Craft Name</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+          <div class="cfg-field-name">Craft Name</div>
+          <label class="switch" title="Send Craft Name">
+            <input type="checkbox" id="craftEn">
+            <span class="track"><span class="thumb"></span></span>
+          </label>
+        </div>
         <div class="cfg-field-desc">Default: recording state / elapsed time. Sent only when BF4.5 mode is on.</div>
         <input class="tpl-input" id="craftTpl" type="text" maxlength="31" spellcheck="false">
       </div>
@@ -488,7 +500,9 @@ const lowPowerToggle = document.getElementById('lowPower');
 const bf45ApplyBtn = document.getElementById('bf45ApplyBtn');
 const bf45SavedMsg = document.getElementById('bf45SavedMsg');
 const bf45CompatToggle = document.getElementById('bf45Compat');
+const pilotEnToggle = document.getElementById('pilotEn');
 const pilotTplInput = document.getElementById('pilotTpl');
+const craftEnToggle = document.getElementById('craftEn');
 const craftTplInput = document.getElementById('craftTpl');
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -540,7 +554,9 @@ async function loadConfig() {
     osd3Input.value      = j.osd3 ?? '';
     osd4Input.value      = j.osd4 ?? '';
     bf45CompatToggle.checked = j.bf45_compat ?? false;
+    pilotEnToggle.checked = j.pilot_en ?? true;
     pilotTplInput.value  = j.pilot_tpl ?? '';
+    craftEnToggle.checked = j.craft_en ?? true;
     craftTplInput.value  = j.craft_tpl ?? '';
     updateDelayEquiv();
     updateAuxModeState();
@@ -717,7 +733,9 @@ bf45ApplyBtn.addEventListener('click', async () => {
   try {
     await saveConfig({
       bf45_compat: bf45CompatToggle.checked,
+      pilot_en:    pilotEnToggle.checked,
       pilot_tpl:   pilotTplInput.value,
+      craft_en:    craftEnToggle.checked,
       craft_tpl:   craftTplInput.value
     });
     flashSaved(bf45SavedMsg);

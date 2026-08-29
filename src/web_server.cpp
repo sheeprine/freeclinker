@@ -92,7 +92,9 @@ void WebConfigServer::handleGetConfig() {
     doc["osd3"]           = c.osd3Tpl;
     doc["osd4"]           = c.osd4Tpl;
     doc["bf45_compat"]    = c.bf45Compat;
+    doc["pilot_en"]       = c.pilotNameEnabled;
     doc["pilot_tpl"]      = c.pilotNameTpl;
+    doc["craft_en"]       = c.craftNameEnabled;
     doc["craft_tpl"]      = c.craftNameTpl;
     String json;
     serializeJson(doc, json);
@@ -125,7 +127,9 @@ void WebConfigServer::handlePostConfig() {
     if (doc["osd3"].is<const char *>())   _cfg->setOsdTemplate(3, doc["osd3"].as<const char *>());
     if (doc["osd4"].is<const char *>())   _cfg->setOsdTemplate(4, doc["osd4"].as<const char *>());
     if (doc["bf45_compat"].is<bool>())    _cfg->setBf45Compat(doc["bf45_compat"].as<bool>());
+    if (doc["pilot_en"].is<bool>())       _cfg->setPilotNameEnabled(doc["pilot_en"].as<bool>());
     if (doc["pilot_tpl"].is<const char *>()) _cfg->setPilotNameTemplate(doc["pilot_tpl"].as<const char *>());
+    if (doc["craft_en"].is<bool>())       _cfg->setCraftNameEnabled(doc["craft_en"].as<bool>());
     if (doc["craft_tpl"].is<const char *>()) _cfg->setCraftNameTemplate(doc["craft_tpl"].as<const char *>());
 
     handleGetConfig();  // return the updated state

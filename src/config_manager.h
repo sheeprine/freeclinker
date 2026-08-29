@@ -32,7 +32,9 @@ public:
         // templates above are not sent at all and pilotNameTpl/craftNameTpl
         // are sent to Pilot Name/Craft Name instead.
         bool     bf45Compat;
+        bool     pilotNameEnabled;  // false = skip sending Pilot Name even when bf45Compat is on
         char     pilotNameTpl[OSD_TPL_LEN];  // Pilot Name (default: battery)
+        bool     craftNameEnabled;  // false = skip sending Craft Name even when bf45Compat is on
         char     craftNameTpl[OSD_TPL_LEN];  // Craft Name (default: recording state)
         // No Caddx SSID/password here — those live in CameraRegistry
         // (see setCaddxSsid()/setCaddxPass()), same storage every other
@@ -53,7 +55,9 @@ public:
     static constexpr const char *DEFAULT_OSD3_TPL = "{mode} {res}/{fps} {eis}";
     static constexpr const char *DEFAULT_OSD4_TPL = "{rleft} {rcap}";
     static constexpr bool     DEFAULT_BF45_COMPAT      = false;
+    static constexpr bool     DEFAULT_PILOT_NAME_ENABLED = true;
     static constexpr const char *DEFAULT_PILOT_NAME_TPL = "CAM:{bat}";
+    static constexpr bool     DEFAULT_CRAFT_NAME_ENABLED = true;
     static constexpr const char *DEFAULT_CRAFT_NAME_TPL = "{rec}";
 
     void begin(Stream &serial);
@@ -80,7 +84,9 @@ public:
     void setLowPowerMode(bool v);
     void setOsdTemplate(uint8_t n, const char *tpl);  // n = 1..4
     void setBf45Compat(bool v);
+    void setPilotNameEnabled(bool v);
     void setPilotNameTemplate(const char *tpl);
+    void setCraftNameEnabled(bool v);
     void setCraftNameTemplate(const char *tpl);
     // Both write into the registry's preferred/newest Caddx entry, not NVS
     // (see CameraEntry) — return false if there's nothing to write to yet

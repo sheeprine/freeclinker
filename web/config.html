@@ -541,13 +541,25 @@
       </div>
 
       <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
-        <div class="cfg-field-name">Pilot Name</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+          <div class="cfg-field-name">Pilot Name</div>
+          <label class="switch" title="Send Pilot Name">
+            <input type="checkbox" id="pilotEn" disabled>
+            <span class="track"><span class="thumb"></span></span>
+          </label>
+        </div>
         <div class="cfg-field-desc">Default: battery percentage. Sent only when BF4.5 mode is on.</div>
         <input class="tpl-input" id="pilotTpl" type="text" maxlength="31" spellcheck="false" disabled>
       </div>
 
       <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
-        <div class="cfg-field-name">Craft Name</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+          <div class="cfg-field-name">Craft Name</div>
+          <label class="switch" title="Send Craft Name">
+            <input type="checkbox" id="craftEn" disabled>
+            <span class="track"><span class="thumb"></span></span>
+          </label>
+        </div>
         <div class="cfg-field-desc">Default: recording state / elapsed time. Sent only when BF4.5 mode is on.</div>
         <input class="tpl-input" id="craftTpl" type="text" maxlength="31" spellcheck="false" disabled>
       </div>
@@ -663,7 +675,9 @@ const osd4Input      = document.getElementById('osd4');
 const osdApplyBtn    = document.getElementById('osdApplyBtn');
 const osdSavedMsg    = document.getElementById('osdSavedMsg');
 const bf45CompatToggle = document.getElementById('bf45Compat');
+const pilotEnToggle   = document.getElementById('pilotEn');
 const pilotTplInput   = document.getElementById('pilotTpl');
+const craftEnToggle   = document.getElementById('craftEn');
 const craftTplInput   = document.getElementById('craftTpl');
 const bf45ApplyBtn    = document.getElementById('bf45ApplyBtn');
 const bf45SavedMsg    = document.getElementById('bf45SavedMsg');
@@ -765,7 +779,11 @@ function parseConfigLine(line) {
   } else if (key === 'osd4') { osd4Input.value = val;
   } else if (key === 'bf45_compat') {
     bf45CompatToggle.checked = (val === 'true');
+  } else if (key === 'pilot_en') {
+    pilotEnToggle.checked = (val === 'true');
   } else if (key === 'pilot_tpl') { pilotTplInput.value = val;
+  } else if (key === 'craft_en') {
+    craftEnToggle.checked = (val === 'true');
   } else if (key === 'craft_tpl') { craftTplInput.value = val;
   }
 }
@@ -939,7 +957,9 @@ osdApplyBtn.addEventListener('click', async () => {
 bf45ApplyBtn.addEventListener('click', async () => {
   const bf45 = bf45CompatToggle.checked ? 1 : 0;
   await sendCommand(`set bf45_compat ${bf45}`);
+  await sendCommand(`set pilot_en ${pilotEnToggle.checked ? 1 : 0}`);
   await sendCommand(`set pilot_tpl ${pilotTplInput.value}`);
+  await sendCommand(`set craft_en ${craftEnToggle.checked ? 1 : 0}`);
   await sendCommand(`set craft_tpl ${craftTplInput.value}`);
   flashSaved(bf45SavedMsg);
 });
@@ -1201,7 +1221,9 @@ function setConnected(connected) {
   osd4Input.disabled     = !connected;
   osdApplyBtn.disabled   = !connected;
   bf45CompatToggle.disabled = !connected;
+  pilotEnToggle.disabled    = !connected;
   pilotTplInput.disabled    = !connected;
+  craftEnToggle.disabled    = !connected;
   craftTplInput.disabled    = !connected;
   bf45ApplyBtn.disabled     = !connected;
   camRefreshBtn.disabled = !connected;
