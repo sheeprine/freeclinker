@@ -57,6 +57,10 @@ Connect the ESP32 to a free Betaflight FC UART. Pin numbers differ by board:
 
 Configure the FC UART for **MSP** at **115200 baud**. See [QUICKSTART.md](QUICKSTART.md) for wiring diagrams.
 
+### 3D printed case
+
+A 3D printable case for the ESP32-C3 Super Mini is available at [`3d/esp32_c3_sm_freeclinker v2.3mf`](3d/esp32_c3_sm_freeclinker%20v2.3mf) (3MF format).
+
 ## Configuration
 
 All tunable parameters are in `include/config.h`:
