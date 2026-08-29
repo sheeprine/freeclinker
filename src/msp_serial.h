@@ -60,8 +60,8 @@ public:
     void sendCameraStatus(const CameraData &data);
 
     // Expand `tpl` with telemetry tokens and push as Betaflight Custom Message N.
-    // Tokens: {bat}=battery%, {rec}=recording state, {mode}/{res}/{fps}/{eis}=settings,
-    //         {rleft}=remaining record time, {rcap}=SD free space.
+    // Tokens: {bat}=battery%, {rec}=recording state, {recdur}=recording duration,
+    //         {mode}/{res}/{fps}/{eis}=settings, {rleft}=remaining record time, {rcap}=SD free space.
     void sendCustomOSD1(const CameraData &data, const char *tpl);
     void sendCustomOSD2(const CameraData &data, const char *tpl);
     void sendCustomOSD3(const CameraData &data, const char *tpl);

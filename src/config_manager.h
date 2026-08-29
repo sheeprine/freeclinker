@@ -55,14 +55,14 @@ public:
     static constexpr uint32_t DEFAULT_WIFI_AP_START_DELAY_SEC = 30;
     static constexpr bool     DEFAULT_WIFI_AP_ENABLED      = true;
     static constexpr const char *DEFAULT_OSD1_TPL = "CAM:{bat}";
-    static constexpr const char *DEFAULT_OSD2_TPL = "{rec}";
+    static constexpr const char *DEFAULT_OSD2_TPL = "{rec}{recdur}";
     static constexpr const char *DEFAULT_OSD3_TPL = "{mode} {res}/{fps} {eis}";
     static constexpr const char *DEFAULT_OSD4_TPL = "{rleft} {rcap}";
     static constexpr bool     DEFAULT_BF45_COMPAT      = false;
     static constexpr bool     DEFAULT_PILOT_NAME_ENABLED = true;
     static constexpr const char *DEFAULT_PILOT_NAME_TPL = "CAM:{bat}";
     static constexpr bool     DEFAULT_CRAFT_NAME_ENABLED = true;
-    static constexpr const char *DEFAULT_CRAFT_NAME_TPL = "{rec}";
+    static constexpr const char *DEFAULT_CRAFT_NAME_TPL = "{rec}{recdur}";
 
     void begin(Stream &serial);
     void update();

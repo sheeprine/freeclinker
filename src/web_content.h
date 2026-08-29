@@ -360,6 +360,7 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
           Available tokens:
           <code>{bat}</code> battery % &nbsp;·&nbsp;
           <code>{rec}</code> recording state &nbsp;·&nbsp;
+          <code>{recdur}</code> recording duration &nbsp;·&nbsp;
           <code>{mode}</code> camera mode &nbsp;·&nbsp;
           <code>{res}</code> resolution &nbsp;·&nbsp;
           <code>{fps}</code> frame rate &nbsp;·&nbsp;
@@ -421,6 +422,7 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
           Available tokens:
           <code>{bat}</code> battery % &nbsp;·&nbsp;
           <code>{rec}</code> recording state &nbsp;·&nbsp;
+          <code>{recdur}</code> recording duration &nbsp;·&nbsp;
           <code>{mode}</code> camera mode &nbsp;·&nbsp;
           <code>{res}</code> resolution &nbsp;·&nbsp;
           <code>{fps}</code> frame rate &nbsp;·&nbsp;

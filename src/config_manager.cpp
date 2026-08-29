@@ -159,7 +159,7 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         out.println("  set osd2 <template>        - OSD Custom Message 2 template (default: recording)");
         out.println("  set osd3 <template>        - OSD Custom Message 3 template (default: settings)");
         out.println("  set osd4 <template>        - OSD Custom Message 4 template (default: storage)");
-        out.println("  Tokens: {bat} {rec} {mode} {res} {fps} {eis} {rleft} {rcap}");
+        out.println("  Tokens: {bat} {rec} {recdur} {mode} {res} {fps} {eis} {rleft} {rcap}");
         out.println("  set bf45_compat <0|1>      - 1=target Betaflight 4.5: send pilot_tpl/craft_tpl to Pilot Name/Craft Name, stop sending osd1-4 (no Custom Message fields on 4.5)");
         out.println("  set pilot_en <0|1>         - enable (1, default) or disable (0) sending Pilot Name, when bf45_compat=1");
         out.println("  set pilot_tpl <template>   - Pilot Name template, used only when bf45_compat=1 and pilot_en=1 (default: battery)");

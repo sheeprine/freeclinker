@@ -208,11 +208,15 @@ static void resolveToken(const char *tok, const CameraData &data,
         } else if (data.temp_over >= 2) {
             snprintf(val, valLen, "CAM:HOT");
         } else if (data.recording) {
-            uint16_t mins = data.record_time / 60;
-            uint8_t  secs = data.record_time % 60;
-            snprintf(val, valLen, "REC%3u:%02u", mins, secs);
+            snprintf(val, valLen, "REC");
         } else {
             snprintf(val, valLen, "IDLE");
+        }
+    } else if (strcmp(tok, "recdur") == 0) {
+        if (data.valid && data.temp_over < 2 && data.recording) {
+            uint16_t mins = data.record_time / 60;
+            uint8_t  secs = data.record_time % 60;
+            snprintf(val, valLen, "%3u:%02u", mins, secs);
         }
     } else if (strcmp(tok, "mode") == 0) {
         if (!data.valid) { snprintf(val, valLen, "---"); return; }

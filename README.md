@@ -85,14 +85,14 @@ Runtime settings are changed via the USB serial console and persisted across reb
 | `set aux_channel <0-12>` | 0 | AUX channel for camera mode switch (0 = off) |
 | `set aux_mode <0x##>` | 0x00 | Camera mode when AUX is high (`0x00`=slow-motion, `0x01`=video, `0x0A`=hyperlapse). On GoPro, when already recording, AUX high/low triggers Burst Slo-Mo instead of switching presets. |
 | `set osd1 <template>` | `CAM:{bat}` | OSD Custom Message 1 template |
-| `set osd2 <template>` | `{rec}` | OSD Custom Message 2 template |
+| `set osd2 <template>` | `{rec}{recdur}` | OSD Custom Message 2 template |
 | `set osd3 <template>` | `{mode} {res}/{fps} {eis}` | OSD Custom Message 3 template |
 | `set osd4 <template>` | `{rleft} {rcap}` | OSD Custom Message 4 template |
 | `set bf45_compat <0\|1>` | 0 | Betaflight 4.5 has no Custom Message 1-4 OSD fields. When 1, `osd1`–`osd4` above stop being sent and `pilot_tpl`/`craft_tpl` are sent to Pilot Name/Craft Name instead |
 | `set pilot_tpl <template>` | `CAM:{bat}` | Pilot Name template — sent only when `bf45_compat=1` |
-| `set craft_tpl <template>` | `{rec}` | Craft Name template — sent only when `bf45_compat=1` |
+| `set craft_tpl <template>` | `{rec}{recdur}` | Craft Name template — sent only when `bf45_compat=1` |
 
-OSD template tokens: `{bat}` battery %, `{rec}` recording state, `{mode}` camera mode, `{res}` resolution, `{fps}` frame rate, `{eis}` stabilisation, `{rleft}` SD time remaining, `{rcap}` SD space remaining.
+OSD template tokens: `{bat}` battery %, `{rec}` recording state, `{recdur}` recording duration (blank unless recording), `{mode}` camera mode, `{res}` resolution, `{fps}` frame rate, `{eis}` stabilisation, `{rleft}` SD time remaining, `{rcap}` SD space remaining.
 
 Action commands:
 
