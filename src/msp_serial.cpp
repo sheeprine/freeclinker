@@ -203,7 +203,9 @@ static void resolveToken(const char *tok, const CameraData &data,
         if (data.valid) snprintf(val, valLen, "%3u%%", data.percent);
         else            snprintf(val, valLen, "---");
     } else if (strcmp(tok, "rec") == 0) {
-        if (data.temp_over >= 2) {
+        if (!data.valid) {
+            snprintf(val, valLen, "NC");
+        } else if (data.temp_over >= 2) {
             snprintf(val, valLen, "CAM:HOT");
         } else if (data.recording) {
             uint16_t mins = data.record_time / 60;
