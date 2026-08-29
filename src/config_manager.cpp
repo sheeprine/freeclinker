@@ -20,6 +20,8 @@ static constexpr const char *KEY_CMM  = "cam_match";
 static constexpr const char *KEY_WAKE = "wake_guard";
 static constexpr const char *KEY_DBG  = "debug_ble";
 static constexpr const char *KEY_LPM  = "low_power";
+static constexpr const char *KEY_WAP_DELAY = "wifi_ap_delay";
+static constexpr const char *KEY_WAP_EN    = "wifi_ap_en";
 static constexpr const char *KEY_BF45  = "bf45_compat";
 static constexpr const char *KEY_PILOT_EN = "pilot_en";
 static constexpr const char *KEY_PILOT = "pilot_tpl";
@@ -49,6 +51,8 @@ void ConfigManager::load() {
     _cfg.cameraWakeGuard   = _prefs.getBool(KEY_WAKE, DEFAULT_CAMERA_WAKE_GUARD);
     _cfg.debugBle          = _prefs.getBool(KEY_DBG, DEFAULT_DEBUG_BLE);
     _cfg.lowPowerMode      = _prefs.getBool(KEY_LPM, DEFAULT_LOW_POWER_MODE);
+    _cfg.wifiApStartDelaySec = _prefs.getUInt(KEY_WAP_DELAY, DEFAULT_WIFI_AP_START_DELAY_SEC);
+    _cfg.wifiApEnabled       = _prefs.getBool(KEY_WAP_EN, DEFAULT_WIFI_AP_ENABLED);
     loadStr(_prefs, KEY_OSD1, _cfg.osd1Tpl, sizeof(_cfg.osd1Tpl), DEFAULT_OSD1_TPL);
     loadStr(_prefs, KEY_OSD2, _cfg.osd2Tpl, sizeof(_cfg.osd2Tpl), DEFAULT_OSD2_TPL);
     loadStr(_prefs, KEY_OSD3, _cfg.osd3Tpl, sizeof(_cfg.osd3Tpl), DEFAULT_OSD3_TPL);
@@ -70,6 +74,8 @@ void ConfigManager::save() {
     _prefs.putBool(KEY_WAKE, _cfg.cameraWakeGuard);
     _prefs.putBool(KEY_DBG, _cfg.debugBle);
     _prefs.putBool(KEY_LPM, _cfg.lowPowerMode);
+    _prefs.putUInt(KEY_WAP_DELAY, _cfg.wifiApStartDelaySec);
+    _prefs.putBool(KEY_WAP_EN, _cfg.wifiApEnabled);
     _prefs.putString(KEY_OSD1, _cfg.osd1Tpl);
     _prefs.putString(KEY_OSD2, _cfg.osd2Tpl);
     _prefs.putString(KEY_OSD3, _cfg.osd3Tpl);
@@ -107,6 +113,8 @@ void ConfigManager::printAll(Stream &out) {
     out.printf("[cfg] aux_mode        = 0x%02X\n", _cfg.auxMode);
     out.printf("[cfg] debug_ble       = %s\n", _cfg.debugBle ? "true" : "false");
     out.printf("[cfg] low_power       = %s\n", _cfg.lowPowerMode ? "true" : "false");
+    out.printf("[cfg] wifi_ap_enabled = %s\n", _cfg.wifiApEnabled ? "true" : "false");
+    out.printf("[cfg] wifi_ap_delay   = %u s\n", _cfg.wifiApStartDelaySec);
     out.printf("[cfg] osd1            = %s\n", _cfg.osd1Tpl);
     out.printf("[cfg] osd2            = %s\n", _cfg.osd2Tpl);
     out.printf("[cfg] osd3            = %s\n", _cfg.osd3Tpl);
@@ -145,6 +153,8 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
         out.println("  set aux_mode <0x00-0xFF>   - camera mode when AUX high (0x00=slow_motion 0x01=video 0x0A=hyperlapse)");
         out.println("  set debug_ble <0|1>        - log raw BLE TX/RX packets to the serial console");
         out.println("  set low_power <0|1>        - 1=minimum BLE/Wi-Fi TX power (default) to reduce RC receiver interference, shorter range; 0=maximum TX power (reboot required)");
+        out.println("  set wifi_ap_enabled <0|1>  - 0=never auto-start the config-portal AP (BOOT-button force-AP still works)");
+        out.println("  set wifi_ap_delay <sec>    - seconds after boot/disconnect before the AP auto-starts (default 30)");
         out.println("  set osd1 <template>        - OSD Custom Message 1 template (default: battery)");
         out.println("  set osd2 <template>        - OSD Custom Message 2 template (default: recording)");
         out.println("  set osd3 <template>        - OSD Custom Message 3 template (default: settings)");
@@ -328,6 +338,22 @@ void ConfigManager::handleLine(const char *line, Stream &out) {
             while (*val == ' ') val++;
             setLowPowerMode(strtoul(val, nullptr, 10) != 0);
             out.printf("[cfg] low_power = %s (saved — reboot to apply)\n", _cfg.lowPowerMode ? "true" : "false");
+            return;
+        }
+
+        if (strncmp(rest, "wifi_ap_enabled ", 16) == 0) {
+            const char *val = rest + 16;
+            while (*val == ' ') val++;
+            setWifiApEnabled(strtoul(val, nullptr, 10) != 0);
+            out.printf("[cfg] wifi_ap_enabled = %s (saved)\n", _cfg.wifiApEnabled ? "true" : "false");
+            return;
+        }
+
+        if (strncmp(rest, "wifi_ap_delay ", 14) == 0) {
+            const char *val = rest + 14;
+            while (*val == ' ') val++;
+            setWifiApStartDelay(static_cast<uint32_t>(strtoul(val, nullptr, 10)));
+            out.printf("[cfg] wifi_ap_delay = %u s (saved)\n", _cfg.wifiApStartDelaySec);
             return;
         }
 
@@ -585,6 +611,16 @@ void ConfigManager::setDebugBle(bool v) {
 void ConfigManager::setLowPowerMode(bool v) {
     _cfg.lowPowerMode = v;
     _prefs.putBool(KEY_LPM, v);
+}
+
+void ConfigManager::setWifiApStartDelay(uint32_t sec) {
+    _cfg.wifiApStartDelaySec = sec;
+    _prefs.putUInt(KEY_WAP_DELAY, sec);
+}
+
+void ConfigManager::setWifiApEnabled(bool v) {
+    _cfg.wifiApEnabled = v;
+    _prefs.putBool(KEY_WAP_EN, v);
 }
 
 void ConfigManager::setOsdTemplate(uint8_t n, const char *tpl) {

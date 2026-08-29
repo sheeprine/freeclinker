@@ -406,6 +406,22 @@
         </label>
       </div>
 
+      <!-- WiFi config AP -->
+      <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+          <div class="cfg-field-name">WiFi config AP</div>
+          <label class="switch" title="WiFi config AP">
+            <input type="checkbox" id="wifiApEnabled" checked disabled>
+            <span class="track"><span class="thumb"></span></span>
+          </label>
+        </div>
+        <div class="cfg-field-desc">Auto-start this configuration access point when no camera is connected. Off = never auto-start (holding the BOOT button still forces it on).</div>
+        <div class="num-wrap">
+          <input type="number" id="wifiApDelay" min="0" max="3600" step="5" value="30" disabled>
+          <span class="num-unit">s start delay</span>
+        </div>
+      </div>
+
       <!-- Disarm delay -->
       <div class="cfg-field" style="flex-direction:column; align-items:flex-start;">
         <div class="cfg-field-name">Disarm delay</div>
@@ -661,6 +677,8 @@ const cameraMatchSel      = document.getElementById('cameraMatch');
 const wakeGuardToggle     = document.getElementById('wakeGuard');
 const debugBleToggle      = document.getElementById('debugBle');
 const lowPowerToggle      = document.getElementById('lowPower');
+const wifiApEnabledToggle = document.getElementById('wifiApEnabled');
+const wifiApDelayInput    = document.getElementById('wifiApDelay');
 const delayInput     = document.getElementById('disarmDelay');
 const delayEquiv     = document.getElementById('delayEquiv');
 const savedMsg       = document.getElementById('savedMsg');
@@ -773,6 +791,11 @@ function parseConfigLine(line) {
     debugBleToggle.checked = (val === 'true');
   } else if (key === 'low_power') {
     lowPowerToggle.checked = (val === 'true');
+  } else if (key === 'wifi_ap_enabled') {
+    wifiApEnabledToggle.checked = (val === 'true');
+    updateWifiApState();
+  } else if (key === 'wifi_ap_delay') {
+    wifiApDelayInput.value = parseInt(val) || 0;
   } else if (key === 'osd1') { osd1Input.value = val;
   } else if (key === 'osd2') { osd2Input.value = val;
   } else if (key === 'osd3') { osd3Input.value = val;
@@ -914,6 +937,8 @@ applyBtn.addEventListener('click', async () => {
   await sendCommand(`set wake_guard ${wakeGuard}`);
   await sendCommand(`set debug_ble ${debugBle}`);
   await sendCommand(`set low_power ${lowPower}`);
+  await sendCommand(`set wifi_ap_enabled ${wifiApEnabledToggle.checked ? 1 : 0}`);
+  await sendCommand(`set wifi_ap_delay ${parseInt(wifiApDelayInput.value) || 0}`);
   await sendCommand(`set disarm_delay ${delay}`);
   await sendCommand(`set stop_on_disarm ${stop}`);
   flashSaved(savedMsg);
@@ -968,6 +993,12 @@ auxChannelSel.addEventListener('change', updateAuxModeState);
 
 function updateAuxModeState() {
   auxModeSel.disabled = !port || parseInt(auxChannelSel.value) === 0;
+}
+
+wifiApEnabledToggle.addEventListener('change', updateWifiApState);
+
+function updateWifiApState() {
+  wifiApDelayInput.disabled = !port || !wifiApEnabledToggle.checked;
 }
 
 function flashSaved(el) {
@@ -1212,6 +1243,7 @@ function setConnected(connected) {
   wakeGuardToggle.disabled    = !connected;
   debugBleToggle.disabled     = !connected;
   lowPowerToggle.disabled     = !connected;
+  wifiApEnabledToggle.disabled = !connected;
   delayInput.disabled    = !connected;
   auxChannelSel.disabled = !connected;
   auxApplyBtn.disabled   = !connected;
@@ -1229,6 +1261,7 @@ function setConnected(connected) {
   camRefreshBtn.disabled = !connected;
   camClearBtn.disabled   = !connected;
   updateAuxModeState();
+  updateWifiApState();
 }
 
 connectBtn.addEventListener('click', connect);

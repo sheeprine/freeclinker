@@ -53,13 +53,16 @@
 
 // ─── WiFi AP (configuration web interface) ───────────────────────────────────
 //
-// The AP starts automatically this many ms after boot if no camera has
-// connected yet (or after a camera disconnects).  Set to 0 to disable.
+// The AP starts automatically after boot if no camera has connected yet (or
+// after a camera disconnects). The delay (seconds) and an outright enable/
+// disable toggle are runtime-configurable — see ConfigManager::Config
+// wifiApStartDelaySec / wifiApEnabled (defaults in config_manager.h).
+// Even when disabled, holding the BOOT button forces the AP on regardless
+// (see WIFI_FORCE_AP_PIN below) so the config UI always stays reachable.
 //
 #define WIFI_AP_SSID              "FreeCLinker"
 #define WIFI_AP_PASSWORD          ""              // empty = open network
 #define WIFI_AP_CHANNEL           1
-#define WIFI_AP_START_DELAY_MS    30000           // 30 s
 
 // ─── BOOT-button force-AP ────────────────────────────────────────────────────
 //

@@ -136,8 +136,12 @@ void setup() {
     DBG_SERIAL.printf("[main] Camera type: %s\n", camTypeName);
     DBG_SERIAL.printf("[main] MSP output: TX=GPIO%d @ %u baud\n",
                       BF_TX_PIN, BF_BAUD);
-    DBG_SERIAL.printf("[main] WiFi AP '%s' starts in %u s if no camera connects\n",
-                      WIFI_AP_SSID, WIFI_AP_START_DELAY_MS / 1000);
+    if (configManager.config().wifiApEnabled) {
+        DBG_SERIAL.printf("[main] WiFi AP '%s' starts in %u s if no camera connects\n",
+                          WIFI_AP_SSID, configManager.config().wifiApStartDelaySec);
+    } else {
+        DBG_SERIAL.println("[main] WiFi AP auto-start disabled (BOOT-button force-AP still available)");
+    }
 
     pinMode(WIFI_FORCE_AP_PIN, INPUT_PULLUP);
     pinMode(STATUS_LED_PIN, OUTPUT);
@@ -251,10 +255,10 @@ void loop() {
         }
     }
 
-    if (!camConnected && cameraWasConnected && !forceAP) {
+    if (!camConnected && cameraWasConnected && !forceAP && configManager.config().wifiApEnabled) {
         // Camera just disconnected — restart the countdown.
         DBG_SERIAL.printf("[wifi] Camera disconnected — AP starts in %u s\n",
-                          WIFI_AP_START_DELAY_MS / 1000);
+                          configManager.config().wifiApStartDelaySec);
         wifiDelayOriginMs = now;
     }
 
@@ -263,8 +267,8 @@ void loop() {
     if (!webServer.isRunning() &&
         !forceAP &&
         !camConnected &&
-        WIFI_AP_START_DELAY_MS > 0 &&
-        (now - wifiDelayOriginMs) >= WIFI_AP_START_DELAY_MS) {
+        configManager.config().wifiApEnabled &&
+        (now - wifiDelayOriginMs) >= (configManager.config().wifiApStartDelaySec * 1000UL)) {
         webServer.begin(configManager, &cameraRegistry, &DBG_SERIAL);
     }
 

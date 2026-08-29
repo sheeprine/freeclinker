@@ -230,6 +230,22 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTML(
         </label>
       </div>
 
+      <!-- WiFi config AP -->
+      <div class="cfg-field" style="flex-direction:column;align-items:flex-start;">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+          <div class="cfg-field-name">WiFi config AP</div>
+          <label class="switch" title="WiFi config AP">
+            <input type="checkbox" id="wifiApEnabled" checked>
+            <span class="track"><span class="thumb"></span></span>
+          </label>
+        </div>
+        <div class="cfg-field-desc">Auto-start this configuration access point when no camera is connected. Off = never auto-start (holding the BOOT button still forces it on).</div>
+        <div class="num-wrap">
+          <input type="number" id="wifiApDelay" min="0" max="3600" step="5" value="30">
+          <span class="num-unit">s start delay</span>
+        </div>
+      </div>
+
       <!-- Stop on disarm -->
       <div class="cfg-field">
         <div class="cfg-field-text">
@@ -497,6 +513,8 @@ const osd4Input    = document.getElementById('osd4');
 const cameraMatchSel = document.getElementById('cameraMatch');
 const wakeGuardToggle = document.getElementById('wakeGuard');
 const lowPowerToggle = document.getElementById('lowPower');
+const wifiApEnabledToggle = document.getElementById('wifiApEnabled');
+const wifiApDelayInput = document.getElementById('wifiApDelay');
 const bf45ApplyBtn = document.getElementById('bf45ApplyBtn');
 const bf45SavedMsg = document.getElementById('bf45SavedMsg');
 const bf45CompatToggle = document.getElementById('bf45Compat');
@@ -549,6 +567,8 @@ async function loadConfig() {
     cameraMatchSel.value = j.camera_match  ?? 0;
     wakeGuardToggle.checked = j.wake_guard ?? true;
     lowPowerToggle.checked = j.low_power ?? true;
+    wifiApEnabledToggle.checked = j.wifi_ap_enabled ?? true;
+    wifiApDelayInput.value = j.wifi_ap_delay ?? 30;
     osd1Input.value      = j.osd1 ?? '';
     osd2Input.value      = j.osd2 ?? '';
     osd3Input.value      = j.osd3 ?? '';
@@ -561,6 +581,7 @@ async function loadConfig() {
     updateDelayEquiv();
     updateAuxModeState();
     updateCameraTypeState();
+    updateWifiApState();
   } catch (e) {
     console.error('loadConfig:', e);
   }
@@ -632,6 +653,8 @@ applyBtn.addEventListener('click', async () => {
       camera_match:   parseInt(cameraMatchSel.value),
       wake_guard:     wakeGuardToggle.checked,
       low_power:      lowPowerToggle.checked,
+      wifi_ap_enabled: wifiApEnabledToggle.checked,
+      wifi_ap_delay:  parseInt(wifiApDelayInput.value) || 0,
       stop_on_disarm: stopToggle.checked,
       disarm_delay:   parseInt(delayInput.value) || 0
     };
@@ -746,6 +769,11 @@ sendBtn.addEventListener('click', sendCurrent);
 
 function updateAuxModeState() {
   auxModeSel.disabled = parseInt(auxChannelSel.value) === 0;
+}
+
+wifiApEnabledToggle.addEventListener('change', updateWifiApState);
+function updateWifiApState() {
+  wifiApDelayInput.disabled = !wifiApEnabledToggle.checked;
 }
 
 function flashSaved(el) {
