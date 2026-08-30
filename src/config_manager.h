@@ -30,7 +30,7 @@ public:
         char osd3Tpl[OSD_TPL_LEN];  // Custom Message 3 (default: camera settings)
         char osd4Tpl[OSD_TPL_LEN];  // Custom Message 4 (default: storage)
         // Betaflight 4.5 has Pilot Name and Craft Name but not the Custom
-        // Message 1-4 fields (added in 4.6). When enabled, the four osdN
+        // Message 1-4 fields (added in 2025.12.1). When enabled, the four osdN
         // templates above are not sent at all and pilotNameTpl/craftNameTpl
         // are sent to Pilot Name/Craft Name instead.
         bool     bf45Compat;

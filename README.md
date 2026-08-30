@@ -31,7 +31,7 @@ DJI Action / GoPro Camera ←—BLE—→ ESP32 ←—MSP Serial—→ Betafligh
 
 All four custom messages are user-configurable templates (see `set osd1`–`osd4` below).
 
-**Betaflight 4.5**: the Custom Message 1-4 OSD fields were added in BF4.6 and don't exist on 4.5. Enable `bf45_compat` to send telemetry through the Pilot Name and Craft Name fields instead, which BF4.5 does have (see `set bf45_compat`/`pilot_tpl`/`craft_tpl` below).
+**Betaflight 4.5**: the Custom Message 1-4 OSD fields were added in BF2025.12.1 and don't exist on 4.5. Enable `bf45_compat` to send telemetry through the Pilot Name and Craft Name fields instead, which BF4.5 does have (see `set bf45_compat`/`pilot_tpl`/`craft_tpl` below).
 
 ## Hardware setup
 

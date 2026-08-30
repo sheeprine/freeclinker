@@ -68,7 +68,7 @@ public:
     void sendCustomOSD4(const CameraData &data, const char *tpl);
 
     // BF4.5 compatibility: Betaflight 4.5 has the Pilot Name and Craft Name
-    // fields but not the Custom Message 1-4 fields (added in 4.6). Expand
+    // fields but not the Custom Message 1-4 fields (added in 2025.12.1). Expand
     // `tpl` the same way as sendCustomOSD1-4 but write it into those fields
     // instead.
     void sendPilotName(const CameraData &data, const char *tpl);
